@@ -1,10 +1,10 @@
 :root {
-  --night: #070c18;
-  --deep: #0d1730;
-  --amber: #ffba5c;
-  --amber-pale: #ffe6bd;
-  --teal: #7ae8c8;
-  --text: #b9c6d8;
+  --dark: #120e18;
+  --stone: #241d2e;
+  --brass: #c69650;
+  --brass-pale: #f0d9a8;
+  --imp: #96f07a;
+  --text: #b9b1c6;
   color-scheme: dark;
 }
 
@@ -14,9 +14,9 @@ html, body { margin: 0; height: 100%; }
 
 body {
   background:
-    radial-gradient(1100px 620px at 50% -12%, #16234a 0%, transparent 62%),
-    radial-gradient(700px 400px at 82% 8%, rgba(255, 186, 92, .10) 0%, transparent 60%),
-    var(--night);
+    radial-gradient(900px 520px at 50% -10%, #2c2338 0%, transparent 62%),
+    radial-gradient(600px 340px at 88% 92%, rgba(198, 150, 80, .10) 0%, transparent 64%),
+    var(--dark);
   color: var(--text);
   font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   display: flex;
@@ -36,11 +36,10 @@ body {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: var(--night);
+  background: var(--dark);
   font-family: Georgia, "Palatino Linotype", serif;
   font-size: 20px;
-  letter-spacing: .04em;
-  color: var(--amber-pale);
+  color: var(--brass-pale);
   transition: opacity .4s ease, visibility 0s linear .4s;
 }
 #loading.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -48,17 +47,17 @@ body {
   width: 240px;
   height: 6px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, .10);
+  background: rgba(255, 255, 255, .1);
   overflow: hidden;
 }
 #loading-bar {
   width: 0;
   height: 100%;
-  background: linear-gradient(90deg, var(--teal), var(--amber));
+  background: linear-gradient(90deg, var(--imp), var(--brass));
   transition: width .2s ease;
 }
 
-/* -------------------------------------------------------------------- scena */
+/* --------------------------------------------------------------------- scena */
 .stage {
   display: flex;
   flex-direction: column;
@@ -72,44 +71,43 @@ canvas#game {
   aspect-ratio: 16 / 9;
   width: min(calc(100vw - 20px), calc((100dvh - 150px) * 16 / 9));
   height: auto;
-  background: var(--deep);
-  border-radius: 12px;
-  border: 1px solid rgba(122, 232, 200, .16);
+  background: var(--stone);
+  border-radius: 10px;
+  border: 1px solid rgba(198, 150, 80, .22);
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, .6),
-    0 0 90px rgba(255, 186, 92, .07);
+    0 22px 56px rgba(0, 0, 0, .62),
+    0 0 80px rgba(198, 150, 80, .06);
   touch-action: none;
 }
 
-/* ----------------------------------------------------------------- comandi */
+/* ------------------------------------------------------------------ comandi */
 .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 
 .controls button {
   font: 14px/1 "Trebuchet MS", system-ui, sans-serif;
-  letter-spacing: .04em;
   color: var(--text);
-  background: rgba(18, 28, 54, .8);
-  border: 1px solid rgba(122, 232, 200, .22);
+  background: rgba(36, 29, 46, .85);
+  border: 1px solid rgba(198, 150, 80, .28);
   border-radius: 999px;
   padding: 9px 18px;
   cursor: pointer;
   transition: color .2s ease, border-color .2s ease, transform .08s ease;
 }
-.controls button:hover { color: var(--amber-pale); border-color: rgba(255, 186, 92, .55); }
+.controls button:hover { color: var(--brass-pale); border-color: rgba(198, 150, 80, .7); }
 .controls button:active { transform: translateY(1px); }
 .controls button:focus-visible,
-.pad button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.pad button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
 .hint {
   margin: 0;
   font-size: 12px;
   line-height: 1.9;
-  opacity: .62;
+  opacity: .6;
   text-align: center;
-  max-width: 720px;
+  max-width: 760px;
 }
 kbd {
-  border: 1px solid rgba(160, 180, 210, .45);
+  border: 1px solid rgba(180, 170, 200, .45);
   border-bottom-width: 2px;
   border-radius: 4px;
   padding: 1px 5px;
@@ -117,30 +115,46 @@ kbd {
   font-family: inherit;
 }
 
-/* ------------------------------------------------- comandi a schermo (touch) */
+/* --------------------------------------------------- comandi a schermo (touch) */
 .pad { display: none; }
 
 @media (hover: none) and (pointer: coarse) {
   .pad {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    width: min(100vw - 20px, 640px);
-    gap: 20px;
+    width: min(100vw - 20px, 620px);
+    gap: 18px;
   }
-  .pad-move, .pad-act { display: flex; gap: 12px; }
+  .dpad {
+    display: grid;
+    grid-template-areas: ". up ." "left . right" ". down .";
+    gap: 6px;
+  }
+  .dpad .up { grid-area: up; }
+  .dpad .left { grid-area: left; }
+  .dpad .right { grid-area: right; }
+  .dpad .down { grid-area: down; }
   .pad button {
-    min-width: 74px;
-    height: 58px;
-    font-size: 18px;
-    color: var(--amber-pale);
-    background: rgba(18, 28, 54, .92);
-    border: 1px solid rgba(122, 232, 200, .28);
-    border-radius: 14px;
-    padding: 0 16px;
+    min-width: 58px;
+    height: 50px;
+    font-size: 17px;
+    color: var(--brass-pale);
+    background: rgba(36, 29, 46, .92);
+    border: 1px solid rgba(198, 150, 80, .32);
+    border-radius: 12px;
   }
-  .pad button:active { background: rgba(255, 186, 92, .2); }
+  .pad .smash {
+    min-width: 108px;
+    height: 82px;
+    font-size: 16px;
+    color: #2a1c10;
+    background: linear-gradient(#e8c076, #c69650);
+    border-color: rgba(255, 226, 172, .6);
+  }
+  .pad button:active { filter: brightness(1.25); }
   .hint { display: none; }
-  canvas#game { width: min(calc(100vw - 20px), calc((100dvh - 230px) * 16 / 9)); }
+  canvas#game { width: min(calc(100vw - 20px), calc((100dvh - 240px) * 16 / 9)); }
 }
 
 @media (max-height: 560px) { .hint { display: none; } }

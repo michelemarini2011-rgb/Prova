@@ -40,51 +40,54 @@
       osc.stop(t0 + dur + 0.03);
     },
 
-    /** Fruscio breve, per passi e atterraggi. */
-    noise(dur, gain, freq, delay) {
+    noise(dur, gain, freq, delay, type) {
       if (!this.ctx || !this.enabled) return;
       const t0 = this.ctx.currentTime + (delay || 0);
       const len = Math.max(1, Math.floor(this.ctx.sampleRate * dur));
       const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       const filter = this.ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.value = freq || 900;
+      filter.type = type || "lowpass";
+      filter.frequency.value = freq || 800;
       const g = this.ctx.createGain();
       g.gain.value = gain || 0.2;
       src.connect(filter).connect(g).connect(this.master);
       src.start(t0);
     },
 
-    jump() { this.tone(300, 0.16, "triangle", 0.2, 620); },
-    land() { this.noise(0.11, 0.16, 700); },
-    collect(streak) {
-      const base = 660 * Math.pow(1.0595, Math.min(12, streak || 0) * 2);
-      this.tone(base, 0.13, "sine", 0.22);
-      this.tone(base * 1.5, 0.1, "sine", 0.12, null, 0.05);
+    /** Colpo sordo sulla roccia più uno squillo metallico. */
+    hammer() {
+      this.tone(120, 0.16, "square", 0.26, 42);
+      this.noise(0.20, 0.30, 620);
+      this.tone(880, 0.09, "triangle", 0.10, 520, 0.01);
     },
-    lantern() {
-      [392, 523, 659, 880].forEach((f, i) => this.tone(f, 0.5, "sine", 0.16, null, i * 0.09));
+    stun() {
+      [740, 620, 520, 440].forEach((f, i) => this.tone(f, 0.16, "sine", 0.13, null, i * 0.05));
     },
-    stomp() {
-      this.tone(180, 0.12, "square", 0.22, 70);
-      this.noise(0.09, 0.14, 500);
+    grab() { this.tone(320, 0.1, "triangle", 0.18, 470); },
+    drop() { this.tone(300, 0.1, "triangle", 0.15, 190); },
+    free() {
+      this.tone(300, 0.28, "sawtooth", 0.2, 720);
+      this.noise(0.2, 0.14, 1500, 0, "highpass");
     },
-    hurt() {
-      this.tone(330, 0.3, "sawtooth", 0.2, 110);
+    box() {
+      this.noise(0.12, 0.24, 900);
+      this.tone(160, 0.14, "square", 0.2, 90, 0.04);
+      [523, 659, 784].forEach((f, i) => this.tone(f, 0.16, "sine", 0.16, null, 0.1 + i * 0.06));
     },
-    death() {
-      [440, 370, 294, 220].forEach((f, i) => this.tone(f, 0.32, "triangle", 0.2, f * 0.7, i * 0.13));
+    hurt() { this.tone(260, 0.3, "sawtooth", 0.22, 90); },
+    lose() {
+      [392, 330, 262, 196].forEach((f, i) => this.tone(f, 0.34, "triangle", 0.2, f * 0.7, i * 0.14));
     },
-    levelClear() {
-      [523, 659, 784, 1046, 1318].forEach((f, i) => this.tone(f, 0.42, "sine", 0.2, null, i * 0.14));
+    portal() {
+      [262, 330, 392, 523, 659].forEach((f, i) => this.tone(f, 0.5, "sine", 0.16, null, i * 0.1));
     },
-    door() { this.tone(196, 0.6, "sine", 0.18, 392); },
+    enterPortal() { this.tone(220, 0.7, "sine", 0.22, 1320); },
     start() {
-      [392, 494, 587].forEach((f, i) => this.tone(f, 0.3, "sine", 0.18, null, i * 0.12));
+      [196, 262, 330].forEach((f, i) => this.tone(f, 0.28, "square", 0.16, null, i * 0.11));
     }
   };
 

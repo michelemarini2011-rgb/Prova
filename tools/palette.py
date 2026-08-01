@@ -1,47 +1,65 @@
-"""Palette condivisa di Forest Tale: bosco al crepuscolo, un solo accento caldo."""
+"""Palette di Martello & Scatole: officina sotterranea, pietra fredda e luce di torcia."""
 
-# fondali, dal più lontano al più vicino
-SKY_TOP = (16, 24, 46)
-SKY_BOTTOM = (38, 58, 82)
-MOON = (226, 234, 210)
+# pietra
+FLOOR = (86, 80, 96)
+FLOOR_DARK = (68, 63, 78)
+FLOOR_LIGHT = (104, 98, 116)
+CRACK = (48, 45, 56)
+WALL_TOP = (128, 118, 140)
+WALL_TOP_LIGHT = (158, 148, 172)
+WALL_FACE = (44, 39, 54)
+WALL_FACE_DARK = (38, 34, 45)
+ROCK = (96, 90, 106)
+ROCK_DARK = (66, 62, 78)
 
-FAR_TREES = (26, 39, 64)
-MID_TREES = (24, 47, 62)
-NEAR_TREES = (14, 27, 42)
-MIST = (58, 86, 122)
+# luce calda dell'officina
+TORCH = (255, 178, 92)
+TORCH_PALE = (255, 226, 172)
+EMBER = (230, 120, 50)
 
-# terreno
-GRASS = (62, 122, 82)
-GRASS_DARK = (40, 88, 62)
-GRASS_LIGHT = (96, 158, 104)
-DIRT = (52, 44, 46)
-DIRT_DARK = (36, 30, 34)
-DIRT_SPECK = (72, 62, 60)
-ROCK = (55, 64, 92)
-WOOD = (74, 54, 46)
-WOOD_LIGHT = (104, 78, 62)
+# il nano
+SKIN = (226, 176, 136)
+SKIN_DARK = (188, 138, 102)
+BEARD = (222, 216, 206)
+BEARD_DARK = (176, 168, 158)
+TUNIC = (150, 58, 58)
+TUNIC_DARK = (108, 40, 44)
+BELT = (74, 52, 38)
+BOOT = (78, 58, 42)
+HELMET = (198, 146, 62)
+HELMET_LIGHT = (238, 194, 108)
+HELMET_DARK = (140, 98, 40)
 
-# accento caldo: lucciole, lanterne, la volpe
-AMBER = (255, 186, 92)
-AMBER_LIGHT = (255, 226, 158)
-AMBER_DEEP = (214, 128, 44)
+# martello
+HANDLE = (140, 98, 62)
+HANDLE_DARK = (102, 70, 44)
+IRON = (146, 152, 168)
+IRON_LIGHT = (196, 202, 218)
+IRON_DARK = (86, 92, 108)
 
-# bioluminescenza fredda, usata con parsimonia
-GLOW_TEAL = (122, 232, 200)
-GLOW_TEAL_DEEP = (48, 148, 138)
+# spiritelli: verde acido, freddo, in contrasto con la pietra calda
+SPRITE = (150, 240, 122)
+SPRITE_DEEP = (78, 176, 92)
+SPRITE_PALE = (222, 255, 208)
+SPRITE_EYE = (26, 40, 30)
+STUN_STAR = (255, 226, 130)
 
-# volpe
-FOX = (216, 124, 62)
-FOX_DARK = (166, 88, 44)
-FOX_CREAM = (246, 226, 198)
-FOX_EYE = (34, 28, 34)
+# macchinario
+MACHINE = (92, 98, 112)
+MACHINE_DARK = (58, 62, 74)
+MACHINE_LIGHT = (132, 138, 154)
+BRASS = (198, 150, 74)
+BRASS_LIGHT = (238, 196, 118)
+GLASS = (122, 214, 226)
 
-# nemici
-BEETLE = (74, 66, 96)
-BEETLE_LIGHT = (110, 100, 140)
-BEETLE_GLOW = (168, 120, 230)
-WISP = (150, 210, 255)
+# casse e portale
+CRATE = (150, 102, 58)
+CRATE_DARK = (110, 72, 40)
+CRATE_LIGHT = (186, 136, 84)
+PORTAL = (168, 118, 246)
+PORTAL_PALE = (226, 206, 255)
+PORTAL_DEEP = (96, 56, 168)
 
-# pericoli
-THORN = (86, 92, 118)
-THORN_LIGHT = (132, 140, 170)
+# interfaccia
+HEART = (226, 78, 84)
+HEART_DARK = (86, 44, 52)

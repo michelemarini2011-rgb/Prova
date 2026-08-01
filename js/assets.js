@@ -4,16 +4,12 @@
 
   const FILES = {
     tiles: "assets/tiles.png",
-    sky: "assets/sky.png",
-    treesFar: "assets/trees_far.png",
-    treesMid: "assets/trees_mid.png",
-    treesNear: "assets/trees_near.png",
-    mist: "assets/mist.png",
-    fox: "assets/fox.png",
-    enemies: "assets/enemies.png",
-    props: "assets/props.png",
-    door: "assets/door.png",
-    leaf: "assets/leaf.png",
+    dwarf: "assets/dwarf.png",
+    imps: "assets/imps.png",
+    machine: "assets/machine.png",
+    crate: "assets/crate.png",
+    portal: "assets/portal.png",
+    icons: "assets/icons.png",
     logo: "assets/logo.png"
   };
 

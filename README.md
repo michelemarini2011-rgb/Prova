@@ -1,13 +1,9 @@
-# Forest Tale
+# Martello & Scatole
 
-Un platform 2D ambientato in un bosco al crepuscolo, in HTML5 + canvas.
-Nessuna libreria e nessuna risorsa esterna: **tutta la grafica è generata
-proceduralmente** da uno script Python incluso nel repository, e i suoni sono
-sintetizzati al volo con la Web Audio API.
-
-Una volpe con la punta della coda accesa attraversa tre capitoli di bosco
-raccogliendo lucciole e accendendo lanterne. La luce non è solo atmosfera: il
-buio copre la scena e si apre solo attorno alle sorgenti luminose.
+Un nano con il martello ripulisce quattro stanze di una miniera dagli spiritelli.
+Gioco a **schermo fisso** in HTML5 + canvas: nessuna libreria, nessuna risorsa
+esterna, **tutta la grafica generata proceduralmente** da uno script Python
+incluso nel repository e tutti i suoni sintetizzati con la Web Audio API.
 
 ## Come si gioca
 
@@ -15,104 +11,121 @@ Apri `index.html` in un browser — basta un doppio clic, non serve un server.
 
 | Comando | Azione |
 |---|---|
-| `←` `→` oppure `A` `D` | corri |
-| `spazio`, `↑` o `W` | salta (tenendo premuto si salta più in alto) |
-| `↓` + `spazio` | scendi attraverso le assi di legno |
+| `←` `↑` `↓` `→` oppure `W` `A` `S` `D` | muovi il nano (otto direzioni) |
+| `spazio` | martella il terreno |
 | `Invio` | conferma / avanza |
-| `P` · `R` · `M` | pausa · ricomincia il capitolo · audio |
+| `P` · `R` · `M` | pausa · ricomincia la stanza · audio |
 
-Su telefono e tablet compaiono i pulsanti a schermo.
+Su telefono e tablet compaiono la croce direzionale e il pulsante *martella*.
 
-Tre foglie di vita. I coleotteri si stordiscono saltandoci sopra; i fuochi
-fatui no, vanno evitati. Le lanterne accese diventano il punto di ripartenza.
-Le lucciole non servono per finire il capitolo: sono la ragione per esplorarlo.
+### Il giro completo
+
+1. **Martella vicino a uno spiritello.** Non si colpisce direttamente: il
+   martello batte per terra a mezza cella davanti al nano e l'onda d'urto
+   sbalza indietro tutto quello che sta nel raggio, lasciandolo **stordito**.
+2. **Trascinalo.** Passandogli sopra il nano se lo carica dietro; l'anello
+   giallo attorno allo spiritello dice quanto torpore resta. Quando diventa
+   rosso, sta per svegliarsi.
+3. **Rinnova il torpore.** Il martello funziona anche mentre trascini: una
+   battuta a terra ricarica l'anello. È così che si attraversa una stanza
+   lunga senza perdere il carico.
+4. **Infilalo nell'imbuto** del macchinario in basso a destra: lo inscatola e
+   la cassa si accatasta lì accanto.
+5. Inscatolati tutti, **si apre il portale**: attraversalo per la stanza
+   successiva.
+
+Tre cuori. Toccare uno spiritello sveglio costa un cuore; se se ne libera uno
+mentre lo trasporti prendi solo uno spintone — la punizione è doverlo
+rincorrere. A cuori finiti si ricomincia la stanza.
+
+Le quattro stanze hanno 3, 4, 5 e 6 spiritelli, sempre più veloci, e il torpore
+scende da 9 a 6 secondi.
 
 ## Come è fatto
 
 ```
 index.html              pagina di gioco
 css/style.css           interfaccia e layout responsivo
-js/levels.js            livelli (file generato)
+js/arenas.js            arene (file generato)
 js/assets.js            caricamento delle immagini
 js/audio.js             sintesi dei suoni
 js/input.js             tastiera e comandi a schermo
-js/world.js             griglia, collisioni, autotile, disegno dello scenario
-js/player.js            fisica della volpe
-js/enemies.js           coleotteri e fuochi fatui
-js/game.js              stati, telecamera, luci, particelle, interfaccia
+js/arena.js             griglia, collisioni, macchinario, disegno della stanza
+js/dwarf.js             il nano: movimento, martellata, trascinamento
+js/imps.js              spiritelli: vagabondaggio, stordimento, fuga
+js/game.js              stati, onda d'urto, consegna, portale, interfaccia
 js/main.js              avvio e ciclo di gioco
 tools/generate_assets.py  generatore di tutta la grafica
 tools/palette.py          palette condivisa
-tools/levels.txt          livelli in ASCII (sorgente)
-tools/build_levels.py     da levels.txt a js/levels.js, con verifiche
+tools/arenas.txt          arene in ASCII (sorgente)
+tools/build_arenas.py     da arenas.txt a js/arenas.js, con verifiche
 tools/bundle.py           versione in un unico file HTML
 assets/*.png              immagini generate
 ```
 
-### Fisica del salto
+### I numeri che contano
 
-I valori stanno in `js/player.js`: gravità 2000 px/s², spinta del salto 640 px/s,
-corsa 232 px/s. Ne discende un salto alto circa **3,2 celle** e lungo circa
-**4,6 celle**, ed è il vincolo con cui sono disegnati i livelli: nessuna
-piattaforma a più di 3 celle sopra l'appoggio, nessun vuoto oltre 3 celle.
-Ci sono anche *coyote time* (0,10 s di salto concesso dopo il bordo) e *jump
-buffer* (0,13 s di salto memorizzato prima di atterrare), che rendono i comandi
-indulgenti senza cambiare la difficoltà.
+Stanno in cima a `js/dwarf.js`: velocità 172 px/s (142 trascinando), martellata
+lunga 0,42 s con l'impatto a 0,19 s, punto d'impatto 30 px davanti al nano,
+raggio dell'onda d'urto 78 px. La spinta sugli spiritelli cala con la distanza
+dal punto d'impatto, così colpire vicino li manda lontano.
+
+Il torpore e la velocità degli spiritelli sono per stanza, dentro
+`tools/arenas.txt`.
 
 ### Luce
 
-Ogni fotogramma un livello di buio viene ritagliato in `destination-out` con
-gradienti radiali sulle sorgenti (coda della volpe, lanterne accese, lucciole,
-fuochi fatui), poi una passata additiva aggiunge l'alone caldo. È il motivo per
-cui il bosco resta leggibile pur essendo notte.
+Ogni fotogramma uno strato di buio viene ritagliato in `destination-out` con
+gradienti radiali attorno al nano, alle torce, al macchinario, agli spiritelli e
+a ogni onda d'urto; poi una passata additiva aggiunge il caldo delle torce. È
+quello che dà alla miniera la sua profondità.
 
 ## Rigenerare la grafica
 
 Le immagini sono già nel repository. Per rifarle — o per cambiare palette,
-dimensione delle celle, aspetto della volpe:
+aspetto del nano, dimensione delle celle:
 
 ```bash
 pip install pillow numpy
 python3 tools/generate_assets.py
 ```
 
-Tutto è disegnato con Pillow a 4× di supersampling, poi ridotto in **alpha
+Tutto è disegnato con Pillow a 4× di supersampling e ridotto in **alpha
 premoltiplicato** (senza, i bordi sfumati si sporcano di nero).
 
 | File | Contenuto |
 |---|---|
-| `tiles.png` | 16 raccordi del terreno in 2 varianti + assi e rovi |
-| `sky.png`, `trees_far/mid/near.png`, `mist.png` | cielo con luna e stelle, tre piani di parallasse, nebbia |
-| `fox.png` | volpe: 4 fotogrammi fermi, 6 di corsa, salto, caduta, colpita |
-| `enemies.png` | coleottero e fuoco fatuo, 4 fotogrammi ciascuno |
-| `props.png` | funghi, felce, erba, sasso, lanterna spenta/accesa, lucciola, ghianda |
-| `door.png`, `leaf.png`, `logo.png`, `favicon.png` | porta nel tronco, vita, logo, icona |
+| `tiles.png` | 16 raccordi di parete, 4 pavimenti, masso e detriti |
+| `dwarf.png` | nano: cammina e martella in 3 orientamenti, 4 fotogrammi ciascuno |
+| `imps.png` | spiritello: fluttua, stordito, in allarme |
+| `machine.png` | macchinario inscatolatore, fermo e in funzione |
+| `portal.png`, `crate.png`, `icons.png` | portale, cassa, cuori e torcia |
+| `logo.png`, `favicon.png` | logo e icona |
 
-## Modificare i livelli
+## Modificare le arene
 
-`tools/levels.txt` è la sorgente, in ASCII leggibile:
+`tools/arenas.txt` è la sorgente, in ASCII leggibile (30×16 celle):
 
 ```
-#  terreno       =  asse attraversabile dal basso   ^  rovi
-P  partenza      D  porta di uscita                 L  lanterna
-o  lucciola      b  coleottero                      w  fuoco fatuo
-m M f t r        decorazioni
+#  roccia    .  pavimento   ,  detriti   R  masso
+P  partenza  S  spiritello  M  angolo del macchinario  O  portale  T  torcia
+!!! stordimento=<secondi> velocita=<px al secondo>
 ```
 
 Dopo averlo modificato:
 
 ```bash
-python3 tools/build_levels.py
+python3 tools/build_arenas.py
 ```
 
-Lo script controlla che ogni livello abbia 20 righe, esattamente una partenza e
-una porta, e solo simboli previsti; poi riscrive `js/levels.js`.
+Lo script controlla che ogni arena abbia 16 righe, il bordo chiuso, una sola
+partenza, un solo macchinario, un solo portale e almeno uno spiritello; poi
+riscrive `js/arenas.js`.
 
 ## Versione in un file solo
 
 ```bash
-python3 tools/bundle.py dist/forest-tale.html
+python3 tools/bundle.py dist/martello.html
 ```
 
-Incorpora CSS, JavaScript e PNG (come data URI) in un'unica pagina, comoda da
-spostare o condividere senza la cartella `assets/`.
+Incorpora CSS, JavaScript e PNG (come data URI) in un'unica pagina.

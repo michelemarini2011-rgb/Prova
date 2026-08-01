@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Impacchetta Forest Tale in un unico file HTML autosufficiente.
+Impacchetta Martello & Scatole in un unico file HTML autosufficiente.
 
-    python3 tools/bundle.py dist/forest-tale.html
+    python3 tools/bundle.py dist/martello.html
 
 CSS e JavaScript finiscono dentro la pagina e ogni PNG diventa un data URI,
 così il file si può aprire o condividere da solo, senza la cartella assets/.
@@ -20,13 +20,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 CSS_FILES = ["css/style.css"]
 JS_FILES = [
-    "js/levels.js",
+    "js/arenas.js",
     "js/assets.js",
     "js/audio.js",
     "js/input.js",
-    "js/world.js",
-    "js/player.js",
-    "js/enemies.js",
+    "js/arena.js",
+    "js/dwarf.js",
+    "js/imps.js",
     "js/game.js",
     "js/main.js",
 ]
@@ -54,7 +54,7 @@ def body_markup():
 
 def build(body_only):
     parts = [
-        "<title>Forest Tale</title>",
+        "<title>Martello &amp; Scatole</title>",
         "<style>\n" + "\n".join(read(p) for p in CSS_FILES) + "\n</style>",
         body_markup(),
         "<script>\n" + inline_assets("\n".join(read(p) for p in JS_FILES)) + "\n</script>",
@@ -69,7 +69,7 @@ def build(body_only):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("output", nargs="?", default="dist/forest-tale.html")
+    ap.add_argument("output", nargs="?", default="dist/martello.html")
     ap.add_argument("--body", action="store_true", help="solo il contenuto del body")
     args = ap.parse_args()
 

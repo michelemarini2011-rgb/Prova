@@ -37,10 +37,10 @@
 
         const pause = document.getElementById("btn-pause");
         if (pause) pause.addEventListener("click", () => game.togglePause());
+        const restart = document.getElementById("btn-restart");
+        if (restart) restart.addEventListener("click", () => game.restart());
         const sound = document.getElementById("btn-sound");
         if (sound) sound.addEventListener("click", toggleSound);
-        const restart = document.getElementById("btn-restart");
-        if (restart) restart.addEventListener("click", () => game.restartLevel());
 
         const STEP = 1 / 120;
         let last = performance.now();

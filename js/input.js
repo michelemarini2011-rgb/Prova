@@ -2,31 +2,30 @@
 (function () {
   "use strict";
 
-  const KEY_LEFT = ["ArrowLeft", "a", "A"];
-  const KEY_RIGHT = ["ArrowRight", "d", "D"];
-  const KEY_UP = ["ArrowUp", "w", "W"];
-  const KEY_DOWN = ["ArrowDown", "s", "S"];
-  const KEY_JUMP = [" ", "ArrowUp", "w", "W", "z", "Z"];
+  const MAP = {
+    left: ["ArrowLeft", "a", "A"],
+    right: ["ArrowRight", "d", "D"],
+    up: ["ArrowUp", "w", "W"],
+    down: ["ArrowDown", "s", "S"],
+    action: [" ", "z", "Z", "Control"]
+  };
 
   class Input {
     constructor() {
-      this.left = false;
-      this.right = false;
-      this.up = false;
-      this.down = false;
-      this.jump = false;
-      this.jumpPressed = false;
+      this.left = this.right = this.up = this.down = false;
+      this.action = false;
+      this.actionPressed = false;
       this._held = {};
-      this._touch = { left: false, right: false, jump: false, down: false };
-      this.onAction = null;      // Invio / tocco: conferma
-      this.onKey = null;         // altri tasti (P, M, R)
-      this.onGesture = null;     // primo gesto: sblocca l'audio
+      this._touch = { left: false, right: false, up: false, down: false, action: false };
+      this.onAction = null;
+      this.onKey = null;
+      this.onGesture = null;
     }
 
     attach(target) {
       window.addEventListener("keydown", (ev) => {
-        if (ev.repeat) { ev.preventDefault(); return; }
         this._gesture();
+        if (ev.repeat) { if (this._known(ev.key)) ev.preventDefault(); return; }
         if (this._set(ev.key, true)) ev.preventDefault();
         if (ev.key === "Enter" || ev.key === " ") {
           if (this.onAction) this.onAction();
@@ -34,7 +33,7 @@
         }
         if (this.onKey) this.onKey(ev.key);
       });
-      window.addEventListener("keyup", (ev) => { this._set(ev.key, false); });
+      window.addEventListener("keyup", (ev) => this._set(ev.key, false));
       window.addEventListener("blur", () => { this._held = {}; this._sync(); });
 
       document.querySelectorAll("[data-btn]").forEach((btn) => {
@@ -60,14 +59,16 @@
 
     _gesture() { if (this.onGesture) this.onGesture(); }
 
+    _known(key) {
+      for (const name in MAP) if (MAP[name].indexOf(key) >= 0) return true;
+      return false;
+    }
+
     _set(key, down) {
-      let used = false;
-      [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_JUMP].forEach((list) => {
-        if (list.indexOf(key) >= 0) used = true;
-      });
-      if (used) this._held[key] = down;
+      const known = this._known(key);
+      if (known) this._held[key] = down;
       this._sync();
-      return used;
+      return known;
     }
 
     _any(list) {
@@ -76,17 +77,17 @@
     }
 
     _sync() {
-      const jumpNow = this._any(KEY_JUMP) || this._touch.jump;
-      this.left = this._any(KEY_LEFT) || this._touch.left;
-      this.right = this._any(KEY_RIGHT) || this._touch.right;
-      this.up = this._any(KEY_UP);
-      this.down = this._any(KEY_DOWN) || this._touch.down;
-      if (jumpNow && !this.jump) this.jumpPressed = true;
-      this.jump = jumpNow;
+      this.left = this._any(MAP.left) || this._touch.left;
+      this.right = this._any(MAP.right) || this._touch.right;
+      this.up = this._any(MAP.up) || this._touch.up;
+      this.down = this._any(MAP.down) || this._touch.down;
+      const now = this._any(MAP.action) || this._touch.action;
+      if (now && !this.action) this.actionPressed = true;
+      this.action = now;
     }
 
-    /** Da chiamare a fine frame: il salto "appena premuto" dura un solo frame. */
-    endFrame() { this.jumpPressed = false; }
+    /** A fine frame: "appena premuto" vale un solo frame. */
+    endFrame() { this.actionPressed = false; }
   }
 
   window.Input = Input;
