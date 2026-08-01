@@ -1,0 +1,146 @@
+:root {
+  --night: #070c18;
+  --deep: #0d1730;
+  --amber: #ffba5c;
+  --amber-pale: #ffe6bd;
+  --teal: #7ae8c8;
+  --text: #b9c6d8;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  background:
+    radial-gradient(1100px 620px at 50% -12%, #16234a 0%, transparent 62%),
+    radial-gradient(700px 400px at 82% 8%, rgba(255, 186, 92, .10) 0%, transparent 60%),
+    var(--night);
+  color: var(--text);
+  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------- caricamento */
+#loading {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--night);
+  font-family: Georgia, "Palatino Linotype", serif;
+  font-size: 20px;
+  letter-spacing: .04em;
+  color: var(--amber-pale);
+  transition: opacity .4s ease, visibility 0s linear .4s;
+}
+#loading.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+#loading .bar {
+  width: 240px;
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .10);
+  overflow: hidden;
+}
+#loading-bar {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), var(--amber));
+  transition: width .2s ease;
+}
+
+/* -------------------------------------------------------------------- scena */
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-height: 100%;
+}
+
+canvas#game {
+  display: block;
+  aspect-ratio: 16 / 9;
+  width: min(calc(100vw - 20px), calc((100dvh - 150px) * 16 / 9));
+  height: auto;
+  background: var(--deep);
+  border-radius: 12px;
+  border: 1px solid rgba(122, 232, 200, .16);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, .6),
+    0 0 90px rgba(255, 186, 92, .07);
+  touch-action: none;
+}
+
+/* ----------------------------------------------------------------- comandi */
+.controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+.controls button {
+  font: 14px/1 "Trebuchet MS", system-ui, sans-serif;
+  letter-spacing: .04em;
+  color: var(--text);
+  background: rgba(18, 28, 54, .8);
+  border: 1px solid rgba(122, 232, 200, .22);
+  border-radius: 999px;
+  padding: 9px 18px;
+  cursor: pointer;
+  transition: color .2s ease, border-color .2s ease, transform .08s ease;
+}
+.controls button:hover { color: var(--amber-pale); border-color: rgba(255, 186, 92, .55); }
+.controls button:active { transform: translateY(1px); }
+.controls button:focus-visible,
+.pad button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.9;
+  opacity: .62;
+  text-align: center;
+  max-width: 720px;
+}
+kbd {
+  border: 1px solid rgba(160, 180, 210, .45);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-family: inherit;
+}
+
+/* ------------------------------------------------- comandi a schermo (touch) */
+.pad { display: none; }
+
+@media (hover: none) and (pointer: coarse) {
+  .pad {
+    display: flex;
+    justify-content: space-between;
+    width: min(100vw - 20px, 640px);
+    gap: 20px;
+  }
+  .pad-move, .pad-act { display: flex; gap: 12px; }
+  .pad button {
+    min-width: 74px;
+    height: 58px;
+    font-size: 18px;
+    color: var(--amber-pale);
+    background: rgba(18, 28, 54, .92);
+    border: 1px solid rgba(122, 232, 200, .28);
+    border-radius: 14px;
+    padding: 0 16px;
+  }
+  .pad button:active { background: rgba(255, 186, 92, .2); }
+  .hint { display: none; }
+  canvas#game { width: min(calc(100vw - 20px), calc((100dvh - 230px) * 16 / 9)); }
+}
+
+@media (max-height: 560px) { .hint { display: none; } }

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Forest Tale</title>
+<meta name="description" content="Un platform 2D nel bosco al crepuscolo, con grafica generata proceduralmente.">
+<meta name="theme-color" content="#0a1120">
+<link rel="icon" href="assets/favicon.png" type="image/png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="loading">
+  <p>Il bosco si sveglia…</p>
+  <div class="bar"><div id="loading-bar"></div></div>
+</div>
+
+<main class="stage">
+  <canvas id="game" width="960" height="540" aria-label="Area di gioco di Forest Tale"></canvas>
+
+  <div class="pad" aria-hidden="true">
+    <div class="pad-move">
+      <button data-btn="left" type="button">◀</button>
+      <button data-btn="right" type="button">▶</button>
+    </div>
+    <div class="pad-act">
+      <button data-btn="down" type="button">▼</button>
+      <button data-btn="jump" type="button">salta</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="btn-pause" type="button">⏸ pausa</button>
+    <button id="btn-restart" type="button">↺ capitolo</button>
+    <button id="btn-sound" type="button" aria-pressed="true">♪ audio</button>
+  </div>
+
+  <p class="hint">
+    <kbd>←</kbd><kbd>→</kbd> corri · <kbd>spazio</kbd> salta · <kbd>↓</kbd>+<kbd>spazio</kbd> scendi dalle assi ·
+    <kbd>P</kbd> pausa · <kbd>R</kbd> ricomincia il capitolo · <kbd>M</kbd> audio
+  </p>
+</main>
+
+<script src="js/levels.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/world.js"></script>
+<script src="js/player.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
