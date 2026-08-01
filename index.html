@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pac-Man HTML5</title>
+<meta name="description" content="Clone di Pac-Man in HTML5 e canvas, con asset grafici generati proceduralmente.">
+<meta name="theme-color" content="#05060f">
+<link rel="icon" href="assets/favicon.png" type="image/png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="loading">
+  <p>Caricamento…</p>
+  <div class="bar"><div id="loading-bar"></div></div>
+</div>
+
+<main class="cabinet">
+  <canvas id="game" width="672" height="864" aria-label="Area di gioco Pac-Man"></canvas>
+
+  <div class="controls">
+    <button id="btn-start" type="button">▶ Avvia</button>
+    <button id="btn-pause" type="button">⏸ Pausa</button>
+    <button id="btn-sound" type="button" aria-pressed="true">🔊 Audio</button>
+  </div>
+
+  <div class="dpad" aria-hidden="true">
+    <button class="up" data-dir="3" type="button">▲</button>
+    <button class="left" data-dir="2" type="button">◀</button>
+    <button class="right" data-dir="0" type="button">▶</button>
+    <button class="down" data-dir="1" type="button">▼</button>
+  </div>
+
+  <p class="hint">
+    Frecce o <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> per muoverti ·
+    <kbd>Invio</kbd> avvia · <kbd>P</kbd> pausa · <kbd>M</kbd> audio ·
+    su mobile scorri il dito o usa la croce direzionale.
+  </p>
+</main>
+
+<script src="js/maze-layout.js"></script>
+<script src="js/config.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/level.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
