@@ -3,6 +3,7 @@
   "use strict";
 
   const FILES = {
+    backdrop: "assets/backdrop.png",
     tiles: "assets/tiles.png",
     dwarf: "assets/dwarf.png",
     imps: "assets/imps.png",

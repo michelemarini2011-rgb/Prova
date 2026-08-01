@@ -67,6 +67,8 @@
     stun() {
       [740, 620, 520, 440].forEach((f, i) => this.tone(f, 0.16, "sine", 0.13, null, i * 0.05));
     },
+    jump() { this.tone(300, 0.15, "triangle", 0.18, 600); },
+    land() { this.noise(0.10, 0.14, 620); },
     grab() { this.tone(320, 0.1, "triangle", 0.18, 470); },
     drop() { this.tone(300, 0.1, "triangle", 0.15, 190); },
     free() {

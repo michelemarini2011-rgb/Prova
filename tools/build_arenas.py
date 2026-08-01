@@ -14,7 +14,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COLS, ROWS = 30, 16
-LEGAL = set("#.,RPSMOT")
+LEGAL = set("#.=PSMObrf")
 
 
 def parse(path):
@@ -59,11 +59,12 @@ def check(arenas):
         a["imps"] = joined.count("S")
         if a["imps"] < 1:
             errors.append(f"{name}: nessuno spiritello")
-        # il bordo dev'essere chiuso, altrimenti si esce dall'arena
-        border_ok = all(a["rows"][0][x] in "#T" and a["rows"][ROWS - 1][x] in "#T" for x in range(COLS)) \
-            and all(a["rows"][y][0] in "#T" and a["rows"][y][COLS - 1] in "#T" for y in range(ROWS))
-        if not border_ok:
-            errors.append(f"{name}: il bordo dell'arena non è chiuso")
+        # dev'esserci terreno solido sotto la partenza, altrimenti si cade
+        px = a["rows"][12].find("P") if "P" in a["rows"][12] else -1
+        if px >= 0 and a["rows"][13][px] != "#":
+            errors.append(f"{name}: la partenza non poggia sul terreno")
+        if "#" not in a["rows"][ROWS - 1]:
+            errors.append(f"{name}: manca il terreno sull'ultima riga")
     return errors
 
 

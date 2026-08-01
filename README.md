@@ -1,9 +1,10 @@
 # Martello & Scatole
 
-Un nano con il martello ripulisce quattro stanze di una miniera dagli spiritelli.
-Gioco a **schermo fisso** in HTML5 + canvas: nessuna libreria, nessuna risorsa
-esterna, **tutta la grafica generata proceduralmente** da uno script Python
-incluso nel repository e tutti i suoni sintetizzati con la Web Audio API.
+Un nano con il martello ripulisce dagli spiritelli quattro cave a cielo aperto.
+Platform a **vista laterale** e **schermo fisso** in HTML5 + canvas: nessuna
+libreria, nessuna risorsa esterna, **tutta la grafica generata proceduralmente**
+da uno script Python incluso nel repository e tutti i suoni sintetizzati con la
+Web Audio API.
 
 ## Come si gioca
 
@@ -11,34 +12,38 @@ Apri `index.html` in un browser — basta un doppio clic, non serve un server.
 
 | Comando | Azione |
 |---|---|
-| `←` `↑` `↓` `→` oppure `W` `A` `S` `D` | muovi il nano (otto direzioni) |
-| `spazio` | martella il terreno |
+| `←` `→` oppure `A` `D` | corri |
+| `spazio`, `↑` o `W` | salta (tenendo premuto si salta più in alto) |
+| `X` o `Z` | martella il terreno |
+| `↓` + `spazio` | scendi attraverso le assi di legno |
 | `Invio` | conferma / avanza |
-| `P` · `R` · `M` | pausa · ricomincia la stanza · audio |
+| `P` · `R` · `M` | pausa · ricomincia la cava · audio |
 
-Su telefono e tablet compaiono la croce direzionale e il pulsante *martella*.
+Su telefono e tablet compaiono le frecce e i pulsanti *salta* e *martella*.
 
 ### Il giro completo
 
 1. **Martella vicino a uno spiritello.** Non si colpisce direttamente: il
-   martello batte per terra a mezza cella davanti al nano e l'onda d'urto
-   sbalza indietro tutto quello che sta nel raggio, lasciandolo **stordito**.
+   martello batte per terra davanti al nano e l'onda d'urto — un'ellisse larga
+   122 px e alta 96 — sbalza indietro tutto quello che ci finisce dentro,
+   lasciandolo **stordito**. Gli spiritelli storditi cadono a terra.
 2. **Trascinalo.** Passandogli sopra il nano se lo carica dietro; l'anello
    giallo attorno allo spiritello dice quanto torpore resta. Quando diventa
    rosso, sta per svegliarsi.
 3. **Rinnova il torpore.** Il martello funziona anche mentre trascini: una
-   battuta a terra ricarica l'anello. È così che si attraversa una stanza
+   battuta a terra ricarica l'anello. È così che si attraversa una cava
    lunga senza perdere il carico.
 4. **Infilalo nell'imbuto** del macchinario in basso a destra: lo inscatola e
    la cassa si accatasta lì accanto.
-5. Inscatolati tutti, **si apre il portale**: attraversalo per la stanza
+5. Inscatolati tutti, **si apre il portale**: attraversalo per la cava
    successiva.
 
-Tre cuori. Toccare uno spiritello sveglio costa un cuore; se se ne libera uno
-mentre lo trasporti prendi solo uno spintone — la punizione è doverlo
-rincorrere. A cuori finiti si ricomincia la stanza.
+Gli spiritelli volteggiano sopra la testa del nano e ogni tanto **piombano
+giù**: è lì che fanno male. Tre cuori; se se ne libera uno mentre lo trasporti
+prendi solo uno spintone — la punizione è doverlo rincorrere. A cuori finiti si
+ricomincia la cava.
 
-Le quattro stanze hanno 3, 4, 5 e 6 spiritelli, sempre più veloci, e il torpore
+Le quattro cave hanno 3, 4, 5 e 6 spiritelli, sempre più veloci, e il torpore
 scende da 9 a 6 secondi.
 
 ## Come è fatto
@@ -50,9 +55,9 @@ js/arenas.js            arene (file generato)
 js/assets.js            caricamento delle immagini
 js/audio.js             sintesi dei suoni
 js/input.js             tastiera e comandi a schermo
-js/arena.js             griglia, collisioni, macchinario, disegno della stanza
-js/dwarf.js             il nano: movimento, martellata, trascinamento
-js/imps.js              spiritelli: vagabondaggio, stordimento, fuga
+js/arena.js             griglia, collisioni, macchinario, disegno della cava
+js/dwarf.js             il nano: corsa, salto, martellata, trascinamento
+js/imps.js              spiritelli: volo, picchiata, stordimento, fuga
 js/game.js              stati, onda d'urto, consegna, portale, interfaccia
 js/main.js              avvio e ciclo di gioco
 tools/generate_assets.py  generatore di tutta la grafica
@@ -65,20 +70,23 @@ assets/*.png              immagini generate
 
 ### I numeri che contano
 
-Stanno in cima a `js/dwarf.js`: velocità 172 px/s (142 trascinando), martellata
-lunga 0,42 s con l'impatto a 0,19 s, punto d'impatto 30 px davanti al nano,
-raggio dell'onda d'urto 78 px. La spinta sugli spiritelli cala con la distanza
-dal punto d'impatto, così colpire vicino li manda lontano.
+Stanno in cima a `js/dwarf.js`: corsa 196 px/s (134 trascinando), gravità
+2000 px/s², spinta del salto 620 px/s — circa **3 celle** di altezza — con
+*coyote time* 0,10 s e *jump buffer* 0,13 s. La martellata dura 0,42 s e
+l'impatto cade a 0,19 s, 30 px davanti al nano. La spinta sugli spiritelli cala
+con la distanza dal punto d'impatto, così colpire vicino li manda lontano.
 
-Il torpore e la velocità degli spiritelli sono per stanza, dentro
+Da qui discende la geometria delle cave: **gradini e assi non salgono mai più
+di 2 celle** per volta (64 px), ben dentro i 96 px del salto.
+
+Il torpore e la velocità degli spiritelli sono per cava, dentro
 `tools/arenas.txt`.
 
-### Luce
+### Sfondo
 
-Ogni fotogramma uno strato di buio viene ritagliato in `destination-out` con
-gradienti radiali attorno al nano, alle torce, al macchinario, agli spiritelli e
-a ogni onda d'urto; poi una passata additiva aggiunge il caldo delle torce. È
-quello che dà alla miniera la sua profondità.
+`backdrop.png` è un'unica immagine da 960×540 — cielo, sole, nuvole e due file
+di colline con alberelli — generata anch'essa dallo script. Lo schermo è fisso,
+quindi non serve parallasse: il fondale sta dietro e basta.
 
 ## Rigenerare la grafica
 
@@ -95,11 +103,12 @@ premoltiplicato** (senza, i bordi sfumati si sporcano di nero).
 
 | File | Contenuto |
 |---|---|
-| `tiles.png` | 16 raccordi di parete, 4 pavimenti, masso e detriti |
-| `dwarf.png` | nano: cammina e martella in 3 orientamenti, 4 fotogrammi ciascuno |
-| `imps.png` | spiritello: fluttua, stordito, in allarme |
+| `backdrop.png` | cielo, sole, nuvole, colline |
+| `tiles.png` | 16 raccordi del terreno in 2 varianti, asse di legno, cespuglio, sasso, fiori |
+| `dwarf.png` | nano di profilo: fermo, corsa (6 fotogrammi), martellata (4), salto, caduta, traino |
+| `imps.png` | spiritello: in volo, stordito, in picchiata |
 | `machine.png` | macchinario inscatolatore, fermo e in funzione |
-| `portal.png`, `crate.png`, `icons.png` | portale, cassa, cuori e torcia |
+| `portal.png`, `crate.png`, `icons.png` | portale, cassa, cuori e martello |
 | `logo.png`, `favicon.png` | logo e icona |
 
 ## Modificare le arene
@@ -107,8 +116,9 @@ premoltiplicato** (senza, i bordi sfumati si sporcano di nero).
 `tools/arenas.txt` è la sorgente, in ASCII leggibile (30×16 celle):
 
 ```
-#  roccia    .  pavimento   ,  detriti   R  masso
-P  partenza  S  spiritello  M  angolo del macchinario  O  portale  T  torcia
+#  terreno   =  asse di legno (ci si sale da sotto)   .  aria
+P  partenza  S  spiritello (in volo)  M  angolo del macchinario  O  portale
+b  cespuglio   r  sasso   f  fiori
 !!! stordimento=<secondi> velocita=<px al secondo>
 ```
 
@@ -118,9 +128,9 @@ Dopo averlo modificato:
 python3 tools/build_arenas.py
 ```
 
-Lo script controlla che ogni arena abbia 16 righe, il bordo chiuso, una sola
-partenza, un solo macchinario, un solo portale e almeno uno spiritello; poi
-riscrive `js/arenas.js`.
+Lo script controlla che ogni arena abbia 16 righe, il terreno sotto la
+partenza, una sola partenza, un solo macchinario, un solo portale e almeno uno
+spiritello; poi riscrive `js/arenas.js`.
 
 ## Versione in un file solo
 

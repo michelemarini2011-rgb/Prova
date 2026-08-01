@@ -7,16 +7,19 @@
     right: ["ArrowRight", "d", "D"],
     up: ["ArrowUp", "w", "W"],
     down: ["ArrowDown", "s", "S"],
-    action: [" ", "z", "Z", "Control"]
+    jump: [" ", "ArrowUp", "w", "W"],
+    action: ["x", "X", "z", "Z", "Control"]
   };
 
   class Input {
     constructor() {
       this.left = this.right = this.up = this.down = false;
+      this.jump = false;
+      this.jumpPressed = false;
       this.action = false;
       this.actionPressed = false;
       this._held = {};
-      this._touch = { left: false, right: false, up: false, down: false, action: false };
+      this._touch = { left: false, right: false, down: false, jump: false, action: false };
       this.onAction = null;
       this.onKey = null;
       this.onGesture = null;
@@ -81,13 +84,16 @@
       this.right = this._any(MAP.right) || this._touch.right;
       this.up = this._any(MAP.up) || this._touch.up;
       this.down = this._any(MAP.down) || this._touch.down;
+      const jumpNow = this._any(MAP.jump) || this._touch.jump;
+      if (jumpNow && !this.jump) this.jumpPressed = true;
+      this.jump = jumpNow;
       const now = this._any(MAP.action) || this._touch.action;
       if (now && !this.action) this.actionPressed = true;
       this.action = now;
     }
 
     /** A fine frame: "appena premuto" vale un solo frame. */
-    endFrame() { this.actionPressed = false; }
+    endFrame() { this.actionPressed = false; this.jumpPressed = false; }
   }
 
   window.Input = Input;

@@ -10,7 +10,7 @@
   const SERIF = 'Georgia, "Palatino Linotype", "Times New Roman", serif';
   const SANS = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 
-  const GRAB_DIST = 32;
+  const GRAB_DIST = 34;
   const HEARTS = 3;
 
   const store = {
@@ -26,6 +26,21 @@
     ctx.fillText(str, x, y);
   }
 
+  /** Testo con contorno: leggibile sia sul cielo sia sull'erba. */
+  function outlined(ctx, str, x, y, size, color, align, font) {
+    ctx.save();
+    ctx.font = size + "px " + (font || SANS);
+    ctx.textAlign = align || "left";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = Math.max(3, size * 0.18);
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(74,42,22,0.85)";
+    ctx.strokeText(str, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(str, x, y);
+    ctx.restore();
+  }
+
   class Game {
     constructor(canvas, input) {
       canvas.width = W;
@@ -33,12 +48,6 @@
       this.canvas = canvas;
       this.ctx = canvas.getContext("2d");
       this.input = input;
-
-      // il canvas del buio copre solo l'arena: le luci usano le sue coordinate
-      this.lightCanvas = document.createElement("canvas");
-      this.lightCanvas.width = W;
-      this.lightCanvas.height = window.Arena.ROWS * TILE;
-      this.lightCtx = this.lightCanvas.getContext("2d");
 
       this.time = 0;
       this.paused = false;
@@ -111,49 +120,54 @@
     }
 
     // --------------------------------------------------------------- eventi
-    /** Il martello tocca terra: onda d'urto che spinge e stordisce. */
+    onJump() { window.Sfx.jump(); }
+
+    onLand(dwarf) {
+      window.Sfx.land();
+      for (let i = 0; i < 5; i++) {
+        this.particles.push({
+          x: dwarf.cx + (Math.random() - 0.5) * 18, y: dwarf.feet,
+          vx: (Math.random() - 0.5) * 90, vy: -Math.random() * 50,
+          life: 0.35, max: 0.35, size: 2.4, color: "214,166,116"
+        });
+      }
+    }
+
+    /** Il martello tocca terra: onda d'urto che sbalza e stordisce. */
     onHammer(point) {
       this.hammers += 1;
       this.waves.push({ x: point.x, y: point.y, t: 0, max: 0.36 });
       window.Sfx.hammer();
       this.dust(point.x, point.y, 14);
 
-      let hit = 0;
-      // chi è in spalla non viene spinto, ma il colpo gli rinnova il torpore
+      // chi è al traino non viene sbalzato, ma il colpo gli rinnova il torpore
       const carried = this.dwarf.carrying;
       if (carried && !carried.boxed) {
         carried.stun = this.arena.stun;
-        this.burst(carried.x, carried.y, "255,226,130", 8, 110);
+        this.burst(carried.x, carried.y, "255,226,90", 8, 110);
       }
+      let hit = 0;
       for (const imp of this.imps) {
         if (imp.boxed || imp.state === "carried") continue;
-        const d = Math.hypot(imp.x - point.x, imp.y - point.y);
-        if (d > window.Dwarf.SHOCK_R) continue;
-        const power = 340 * (1 - d / window.Dwarf.SHOCK_R) + 150;
+        // distanza normalizzata sull'ellisse: l'onda corre a terra e sale un po'
+        const k = Math.hypot((imp.x - point.x) / window.Dwarf.SHOCK_RX,
+                             (imp.y - point.y) / window.Dwarf.SHOCK_RY);
+        if (k > 1) continue;
+        const power = 300 * (1 - k) + 170;
         imp.shock(point.x, point.y, power, this.arena.stun);
         hit += 1;
-        this.burst(imp.x, imp.y, "255,226,130", 10, 150);
+        this.burst(imp.x, imp.y, "255,226,90", 10, 150);
       }
       if (hit > 0) window.Sfx.stun();
     }
 
-    releaseCarried() {
-      const imp = this.dwarf.carrying;
-      if (!imp) return;
-      imp.state = "stunned";
-      imp.vx = 0;
-      imp.vy = 0;
-      this.dwarf.carrying = null;
-      window.Sfx.drop();
-    }
-
     dust(x, y, n) {
       for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const v = 60 + Math.random() * 140;
+        const a = -Math.random() * Math.PI;
+        const v = 70 + Math.random() * 150;
         this.particles.push({
-          x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.5,
-          life: 0.45, max: 0.45, size: 2 + Math.random() * 2, color: "150,142,160"
+          x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6,
+          life: 0.45, max: 0.45, size: 2 + Math.random() * 2.4, color: "222,182,128"
         });
       }
     }
@@ -206,7 +220,7 @@
       dwarf.update(dt, this.input, this);
       for (const imp of this.imps) if (!imp.boxed) imp.update(dt, dwarf);
 
-      this.checkCarry(dt);
+      this.checkCarry();
       this.checkContact();
       this.checkMachine();
       this.updateEffects(dt);
@@ -220,29 +234,29 @@
       if (this.portalOpen) {
         this.portalT = Math.min(1, this.portalT + dt * 1.6);
         const p = this.arena.portalSpot;
-        if (this.portalT >= 1 && Math.hypot(dwarf.x - p.x, dwarf.y - p.y) < 30) {
+        if (this.portalT >= 1 && Math.abs(dwarf.cx - p.x) < 30 && Math.abs(dwarf.feet - p.y) < 60) {
           window.Sfx.enterPortal();
           this.setState("clear", 1.0);
         }
       }
     }
 
-    checkCarry(dt) {
+    checkCarry() {
       const dwarf = this.dwarf;
       const carried = dwarf.carrying;
       if (carried) {
-        if (carried.stun <= 0) {           // si è svegliato mentre lo trascinavi
+        if (carried.stun <= 0) {                 // si è svegliato mentre lo trascinavi
           carried.breakFree(dwarf);
           dwarf.carrying = null;
-          dwarf.hurt(carried.x, carried.y);      // spintone, ma nessun cuore perso
+          dwarf.hurt(carried.x);                 // spintone, ma nessun cuore perso
           window.Sfx.free();
         }
         return;
       }
-      if (dwarf.swinging) return;
       for (const imp of this.imps) {
         if (imp.boxed || imp.state !== "stunned") continue;
-        if (Math.hypot(imp.x - dwarf.x, imp.y - dwarf.y) > GRAB_DIST) continue;
+        if (Math.abs(imp.x - dwarf.cx) > GRAB_DIST) continue;
+        if (Math.abs(imp.y - (dwarf.feet - 12)) > 34) continue;
         imp.state = "carried";
         dwarf.carrying = imp;
         window.Sfx.grab();
@@ -254,14 +268,15 @@
       const dwarf = this.dwarf;
       for (const imp of this.imps) {
         if (imp.boxed || imp.stunned) continue;
-        if (Math.hypot(imp.x - dwarf.x, imp.y - dwarf.y) > imp.r + dwarf.r + 2) continue;
-        if (!dwarf.hurt(imp.x, imp.y)) continue;
+        const nx = Math.max(dwarf.x, Math.min(imp.x, dwarf.x + dwarf.w));
+        const ny = Math.max(dwarf.y, Math.min(imp.y, dwarf.y + dwarf.h));
+        if (Math.hypot(imp.x - nx, imp.y - ny) > imp.r) continue;
+        if (!dwarf.hurt(imp.x)) continue;
         this.hearts -= 1;
         window.Sfx.hurt();
-        this.burst(dwarf.x, dwarf.y, "226,78,84", 12, 160);
-        const a = Math.atan2(imp.y - dwarf.y, imp.x - dwarf.x);
-        imp.vx = Math.cos(a) * imp.speed * 2;
-        imp.vy = Math.sin(a) * imp.speed * 2;
+        this.burst(dwarf.cx, dwarf.cy, "255,85,102", 12, 160);
+        imp.vx = (imp.x < dwarf.cx ? -1 : 1) * imp.speed * 2;
+        imp.vy = -160;
         if (this.hearts <= 0) this.lose();
         return;
       }
@@ -272,7 +287,7 @@
       const imp = dwarf.carrying;
       if (!imp) return;
       const gate = this.arena.machine.intake;
-      if (Math.hypot(dwarf.x - gate.x, dwarf.y - gate.y) > gate.r) return;
+      if (Math.hypot(dwarf.cx - gate.x, dwarf.cy - gate.y) > gate.r) return;
       imp.boxed = true;
       imp.state = "boxed";
       dwarf.carrying = null;
@@ -280,7 +295,7 @@
       this.arena.machine.crates += 1;
       this.arena.machine.anim = 0.9;
       window.Sfx.box();
-      this.burst(gate.x, gate.y, "122,214,226", 16, 170);
+      this.burst(gate.x, gate.y, "186,244,255", 16, 170);
     }
 
     lose() {
@@ -300,8 +315,8 @@
         if (q.life <= 0) { this.particles.splice(i, 1); continue; }
         q.x += q.vx * dt;
         q.y += q.vy * dt;
-        q.vx *= 0.94;
-        q.vy *= 0.94;
+        q.vy += 320 * dt;
+        q.vx *= 0.96;
       }
     }
 
@@ -313,21 +328,13 @@
 
       ctx.save();
       ctx.translate(0, HUD);
-      this.arena.drawFloor(ctx);
-      this.drawWaves(ctx);
-      this.arena.drawTorches(ctx, this.time);
+      this.arena.drawScene(ctx);
       this.drawPortal(ctx);
       this.arena.drawMachine(ctx, this.time);
-
-      // ordine di profondità: chi sta più in basso è davanti
-      const actors = this.imps.filter((i) => !i.boxed).concat([this.dwarf]);
-      actors.sort((a, b) => a.y - b.y);
-      for (const a of actors) {
-        if (a === this.dwarf) { if (this.state !== "dead") a.draw(ctx); }
-        else a.draw(ctx, this.time);
-      }
+      for (const imp of this.imps) if (!imp.boxed) imp.draw(ctx, this.time);
+      if (this.state !== "dead") this.dwarf.draw(ctx);
+      this.drawWaves(ctx);
       this.drawParticles(ctx);
-      this.drawLighting(ctx);
       ctx.restore();
 
       this.drawHud(ctx);
@@ -340,13 +347,18 @@
     drawWaves(ctx) {
       for (const w of this.waves) {
         const t = w.t / w.max;
-        const r = window.Dwarf.SHOCK_R * (0.25 + t * 0.95);
+        const r = window.Dwarf.SHOCK_RX * (0.25 + t * 0.95);
         ctx.save();
-        ctx.globalAlpha = (1 - t) * 0.85;
-        ctx.strokeStyle = "rgba(255,226,172,0.9)";
+        ctx.globalAlpha = (1 - t) * 0.9;
+        ctx.strokeStyle = "rgba(255,255,255,0.95)";
         ctx.lineWidth = 5 * (1 - t) + 1.5;
         ctx.beginPath();
-        ctx.ellipse(w.x, w.y, r, r * 0.55, 0, 0, Math.PI * 2);
+        ctx.ellipse(w.x, w.y, r, r * 0.42, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255,193,77,0.9)";
+        ctx.lineWidth = 3 * (1 - t) + 1;
+        ctx.beginPath();
+        ctx.ellipse(w.x, w.y, r * 0.7, r * 0.3, 0, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
@@ -359,9 +371,9 @@
       const frame = Math.floor(this.time * 10) % 4;
       const k = this.portalT;
       ctx.save();
-      ctx.translate(p.x, p.y);
+      ctx.translate(p.x, p.y - 64);
       ctx.scale(k, k);
-      ctx.drawImage(img, frame * 96, 0, 96, 96, -48, -48, 96, 96);
+      ctx.drawImage(img, frame * 96, 0, 96, 128, -48, -64, 96, 128);
       ctx.restore();
     }
 
@@ -375,167 +387,112 @@
       }
     }
 
-    drawLighting(ctx) {
-      const lx = this.lightCtx;
-      lx.globalCompositeOperation = "source-over";
-      const LH = this.lightCanvas.height;
-      lx.clearRect(0, 0, W, LH);
-      lx.fillStyle = "rgba(12,9,20,0.34)";
-      lx.fillRect(0, 0, W, LH);
-      lx.globalCompositeOperation = "destination-out";
-
-      const lights = [{ x: this.dwarf.x, y: this.dwarf.y, r: 140, warm: 1 }];
-      this.arena.lights(lights);
-      for (const imp of this.imps) {
-        if (!imp.boxed) lights.push({ x: imp.x, y: imp.y, r: 62, warm: 0 });
-      }
-      for (const w of this.waves) lights.push({ x: w.x, y: w.y, r: 130 * (1 - w.t / w.max), warm: 1 });
-      if (this.portalOpen) {
-        const p = this.arena.portalSpot;
-        lights.push({ x: p.x, y: p.y, r: 150 * this.portalT, warm: 0 });
-      }
-
-      for (const l of lights) {
-        if (l.r <= 1) continue;
-        const g = lx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r);
-        g.addColorStop(0, "rgba(0,0,0,0.95)");
-        g.addColorStop(0.5, "rgba(0,0,0,0.5)");
-        g.addColorStop(1, "rgba(0,0,0,0)");
-        lx.fillStyle = g;
-        lx.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
-      }
-      lx.globalCompositeOperation = "source-over";
-      ctx.drawImage(this.lightCanvas, 0, 0);
-
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      for (const l of lights) {
-        if (!l.warm || l.r <= 1) continue;
-        const g = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r * 0.85);
-        g.addColorStop(0, "rgba(255,178,92," + (0.16 * l.warm).toFixed(3) + ")");
-        g.addColorStop(1, "rgba(255,178,92,0)");
-        ctx.fillStyle = g;
-        ctx.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
-      }
-      ctx.restore();
-    }
-
     drawHud(ctx) {
       const icons = window.Assets.img.icons;
-      ctx.fillStyle = "#15111d";
+      ctx.fillStyle = "#5a3a20";
       ctx.fillRect(0, 0, W, HUD);
-      ctx.fillStyle = "rgba(198,150,74,0.35)";
-      ctx.fillRect(0, HUD - 1, W, 1);
+      ctx.fillStyle = "rgba(255,226,150,0.5)";
+      ctx.fillRect(0, HUD - 2, W, 2);
 
       for (let i = 0; i < HEARTS; i++) {
         ctx.drawImage(icons, (i < this.hearts ? 0 : 32), 0, 32, 32, 8 + i * 24, 2, 24, 24);
       }
       ctx.drawImage(icons, 64, 0, 32, 32, 96, 3, 22, 22);
-      text(ctx, this.boxed + " / " + this.total, 124, HUD / 2 + 1, 16, "#e8dcc4");
-
-      const secs = Math.floor(this.elapsed);
-      text(ctx, "martellate " + this.hammers + "   ·   " + secs + "s", W / 2, HUD / 2 + 1,
-        14, "rgba(200,190,210,0.7)", "center");
-      text(ctx, "Stanza " + (this.index + 1) + " — " + this.arena.name, W - 10, HUD / 2 + 1,
-        15, "rgba(226,200,150,0.85)", "right", SERIF);
+      text(ctx, this.boxed + " / " + this.total, 124, HUD / 2 + 1, 16, "#ffe89b");
+      text(ctx, "martellate " + this.hammers + "   ·   " + Math.floor(this.elapsed) + "s",
+        W / 2, HUD / 2 + 1, 14, "rgba(255,240,214,0.8)", "center");
+      text(ctx, "Cava " + (this.index + 1) + " — " + this.arena.name, W - 10, HUD / 2 + 1,
+        15, "#ffe89b", "right", SERIF);
 
       if (this.portalOpen && this.state === "play") {
-        // in fondo allo schermo, su una fascia scura: leggibile sopra la pietra
         ctx.save();
-        ctx.globalAlpha = 0.55 + 0.45 * Math.sin(this.time * 4);
-        ctx.fillStyle = "rgba(14,11,20,0.72)";
-        ctx.fillRect(0, H - 40, W, 32);
-        text(ctx, "il portale è aperto — attraversalo", W / 2, H - 24, 18, "#d8c0ff", "center", SERIF);
+        ctx.globalAlpha = 0.6 + 0.4 * Math.sin(this.time * 4);
+        outlined(ctx, "il portale è aperto — attraversalo", W / 2, H - 26, 20, "#fff5cf", "center", SERIF);
         ctx.restore();
       }
     }
 
     panel(ctx, y, h) {
-      ctx.fillStyle = "rgba(14,11,20,0.88)";
+      ctx.fillStyle = "rgba(92,52,26,0.9)";
       ctx.fillRect(0, y, W, h);
-      ctx.fillStyle = "rgba(198,150,74,0.4)";
-      ctx.fillRect(0, y, W, 1);
-      ctx.fillRect(0, y + h - 1, W, 1);
+      ctx.fillStyle = "rgba(255,226,150,0.7)";
+      ctx.fillRect(0, y, W, 2);
+      ctx.fillRect(0, y + h - 2, W, 2);
     }
 
     drawCard(ctx) {
       this.panel(ctx, 170, 190);
-      text(ctx, "Stanza " + (this.index + 1), W / 2, 208, 18, "rgba(150,240,122,0.9)", "center");
-      text(ctx, this.arena.name, W / 2, 250, 38, "#f0d9a8", "center", SERIF);
-      text(ctx, this.arena.hint, W / 2, 302, 17, "rgba(210,204,220,0.85)", "center");
-      text(ctx, "spiritelli da inscatolare: " + this.total, W / 2, 336, 16,
-        "rgba(150,240,122,0.85)", "center");
+      text(ctx, "Cava " + (this.index + 1), W / 2, 208, 18, "#b6f0a0", "center");
+      text(ctx, this.arena.name, W / 2, 250, 38, "#ffe89b", "center", SERIF);
+      text(ctx, this.arena.hint, W / 2, 302, 17, "rgba(255,246,226,0.92)", "center");
+      text(ctx, "spiritelli da inscatolare: " + this.total, W / 2, 336, 16, "#b6f0a0", "center");
     }
 
     drawDead(ctx) {
       this.panel(ctx, 210, 120);
-      text(ctx, "Gli spiritelli hanno avuto la meglio", W / 2, 250, 30, "#f0d9a8", "center", SERIF);
-      text(ctx, "si ricomincia la stanza…", W / 2, 292, 17, "rgba(210,204,220,0.8)", "center");
+      text(ctx, "Gli spiritelli hanno avuto la meglio", W / 2, 250, 30, "#ffe89b", "center", SERIF);
+      text(ctx, "si ricomincia la cava…", W / 2, 292, 17, "rgba(255,246,226,0.9)", "center");
     }
 
     drawFinale(ctx) {
-      ctx.fillStyle = "rgba(12,10,18,0.9)";
+      ctx.drawImage(window.Assets.img.backdrop, 0, 0, W, H);
+      ctx.fillStyle = "rgba(92,52,26,0.72)";
       ctx.fillRect(0, 0, W, H);
-      text(ctx, "Tutti inscatolati", W / 2, 160, 46, "#f0d9a8", "center", SERIF);
-      text(ctx, "Quattro stanze ripulite in " + Math.round(this.elapsed) + " secondi, con "
-        + this.hammers + " martellate.", W / 2, 226, 20, "rgba(216,210,224,0.9)", "center");
+      outlined(ctx, "Tutti inscatolati", W / 2, 160, 46, "#ffe89b", "center", SERIF);
+      text(ctx, "Quattro cave ripulite in " + Math.round(this.elapsed) + " secondi, con "
+        + this.hammers + " martellate.", W / 2, 226, 20, "#fff6e2", "center");
       if (this.best > 0) {
-        text(ctx, "Record: " + this.best + " secondi", W / 2, 262, 17,
-          "rgba(150,240,122,0.9)", "center");
+        text(ctx, "Record: " + this.best + " secondi", W / 2, 262, 17, "#b6f0a0", "center");
       }
       if (Math.floor(this.time * 2) % 2 === 0) {
-        text(ctx, "INVIO per ricominciare", W / 2, 340, 19, "rgba(226,206,255,0.95)", "center");
+        text(ctx, "INVIO per ricominciare", W / 2, 340, 19, "#fff5cf", "center");
       }
     }
 
     drawPause(ctx) {
-      ctx.fillStyle = "rgba(12,10,18,0.74)";
+      ctx.fillStyle = "rgba(92,52,26,0.72)";
       ctx.fillRect(0, 0, W, H);
-      text(ctx, "Pausa", W / 2, 244, 42, "#f0d9a8", "center", SERIF);
-      text(ctx, "P per riprendere · R per ricominciare la stanza", W / 2, 296, 17,
-        "rgba(210,204,220,0.85)", "center");
+      outlined(ctx, "Pausa", W / 2, 244, 42, "#ffe89b", "center", SERIF);
+      text(ctx, "P per riprendere · R per ricominciare la cava", W / 2, 296, 17,
+        "#fff6e2", "center");
     }
 
     drawTitle(ctx) {
       const img = window.Assets.img;
-      ctx.fillStyle = "#191320";
-      ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(img.backdrop, 0, 0, W, H);
 
-      // pavimento di fondo, appena illuminato
+      // una striscia di terreno in fondo
       const tiles = img.tiles;
-      for (let y = 0; y < H; y += TILE) {
-        for (let x = 0; x < W; x += TILE) {
-          const v = ((x / TILE) * 5 + (y / TILE) * 11) % 4;
-          ctx.drawImage(tiles, v * TILE, 2 * TILE, TILE, TILE, x, y, TILE, TILE);
-        }
+      for (let x = 0; x < W; x += TILE) {
+        const v = (x / TILE) % 2;
+        const sy = (1 + v * 2) * TILE;
+        ctx.drawImage(tiles, 6 * TILE, sy, TILE, TILE, x, H - TILE * 2, TILE, TILE);
+        ctx.drawImage(tiles, 7 * TILE, sy, TILE, TILE, x, H - TILE, TILE, TILE);
       }
-      ctx.fillStyle = "rgba(12,10,20,0.72)";
-      ctx.fillRect(0, 0, W, H);
 
-      ctx.drawImage(img.logo, (W - img.logo.width) / 2, 46);
+      ctx.drawImage(img.logo, (W - img.logo.width) / 2, 40);
 
-      // il nano martella, uno spiritello rimbalza
+      // il nano martella, lo spiritello rimbalza
       const t = this.time;
-      const beat = t % 1.6;
-      const frame = beat < 0.7 ? Math.min(3, Math.floor(beat / 0.175)) : 0;
-      const row = beat < 0.7 ? 4 : 1;
-      ctx.drawImage(img.dwarf, frame * 64, row * 64, 64, 64, 300, 300, 64, 64);
-      const impX = 400 + (beat < 0.7 ? 0 : Math.min(70, (beat - 0.7) * 150));
-      const impY = 316 - Math.sin(Math.min(1, (beat - 0.7) / 0.6) * Math.PI) * 26;
-      ctx.drawImage(img.imps, (Math.floor(t * 6) % 4) * 48, (beat < 0.7 ? 0 : 48), 48, 48,
-        impX, impY, 48, 48);
-      ctx.drawImage(img.machine, 0, 0, 128, 128, 560, 268, 128, 128);
+      const beat = t % 1.8;
+      const hammering = beat < 0.7;
+      const frame = hammering ? Math.min(3, Math.floor(beat / 0.175)) : Math.floor(t * 6) % 2;
+      const row = hammering ? 2 : 0;
+      const fx = 300;
+      ctx.drawImage(img.dwarf, frame * 64, row * 64, 64, 64, fx, H - TILE * 2 - 58, 64, 64);
+      const k = hammering ? 0 : Math.min(1, (beat - 0.7) / 0.7);
+      const ix = fx + 70 + k * 90;
+      const iy = H - TILE * 2 - 46 - Math.sin(k * Math.PI) * 60;
+      ctx.drawImage(img.imps, (Math.floor(t * 6) % 4) * 48, (hammering ? 0 : 48), 48, 48, ix, iy, 48, 48);
+      ctx.drawImage(img.machine, 0, 0, 128, 128, 640, H - TILE * 2 - 122, 128, 128);
 
       if (Math.floor(t * 2) % 2 === 0) {
-        text(ctx, "PREMI INVIO PER COMINCIARE", W / 2, 420, 22, "#f0d9a8", "center");
+        outlined(ctx, "PREMI INVIO PER COMINCIARE", W / 2, 252, 24, "#fff5cf", "center");
       }
-      text(ctx, "frecce o WASD per muoverti · SPAZIO per martellare: stordisce e rinnova il torpore",
-        W / 2, 464, 16, "rgba(196,190,210,0.8)", "center");
-      text(ctx, "P pausa · R ricomincia la stanza · M audio",
-        W / 2, 490, 16, "rgba(160,154,180,0.75)", "center");
+      outlined(ctx, "← → corri · SPAZIO salta · X martella", W / 2, 292, 18, "#ffffff", "center");
+      outlined(ctx, "P pausa · R ricomincia la cava · M audio", W / 2, 318, 16, "#f6e6cc", "center");
       if (this.best > 0) {
-        text(ctx, "Record: " + this.best + " secondi", W / 2, 518, 16,
-          "rgba(150,240,122,0.85)", "center");
+        outlined(ctx, "Record: " + this.best + " secondi", W / 2, 344, 17, "#d8ffc0", "center");
       }
     }
   }
