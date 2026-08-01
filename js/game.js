@@ -15,6 +15,13 @@
 
   const FONT = '"Courier New", ui-monospace, SFMono-Regular, monospace';
 
+  // Il salvataggio del record non deve mai bloccare il gioco (browser in
+  // modalità privata, pagine incorporate, storage disabilitato).
+  const store = {
+    get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
+    set(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* ignorato */ } }
+  };
+
   function text(ctx, str, x, y, size, color, align, weight) {
     ctx.font = (weight || 700) + " " + size + "px " + FONT;
     ctx.fillStyle = color;
@@ -37,7 +44,7 @@
       this.pacman = new E.Pacman(this.level);
       this.ghosts = E.createGhosts(this.level);
 
-      this.highScore = Number(localStorage.getItem("pacman-record") || 0);
+      this.highScore = Number(store.get("pacman-record") || 0);
       this.state = "title";
       this.titleTime = 0;
       this.time = 0;
@@ -103,7 +110,7 @@
       }
       if (this.score > this.highScore) {
         this.highScore = this.score;
-        localStorage.setItem("pacman-record", String(this.highScore));
+        store.set("pacman-record", String(this.highScore));
       }
     }
 
