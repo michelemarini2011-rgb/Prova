@@ -124,6 +124,28 @@ I comandi a schermo stanno su una **griglia elastica** a cinque colonne
 invece di avere misure fisse, così non escono mai dallo schermo — nemmeno su un
 telefono da 320 px. La pagina lascia al gioco tutta l'altezza che avanza.
 
+### Come si ascolta il tocco
+
+I pulsanti **non hanno un ascoltatore ciascuno**. A ogni evento di tocco
+`js/input.js` ricalcola lo stato da zero, controllando dove si trovano *tutte* le
+dita appoggiate allo schermo. Serve perché un tocco resta legato all'elemento su
+cui è iniziato: facendo scorrere il pollice da ◀ a ▶, il secondo pulsante non
+riceverebbe mai un `touchstart` — e un `touchend` perso lascerebbe un tasto
+premuto per sempre. Attorno a ogni pulsante c'è un margine di tolleranza (6 px di
+lato, 14 sopra e sotto, perché il pollice arriva dal basso) e, se due sono
+entrambi a tiro, vince il più vicino.
+
+Se sinistra e destra risultano premute insieme — capita di continuo appoggiando
+il pollice sull'altro tasto prima di aver staccato il primo — **vince l'ultima
+arrivata** invece di annullarsi a vicenda; mollandola torna a valere quella
+ancora premuta. Vale anche per la tastiera.
+
+Sui comandi il CSS mette `touch-action: none` e disattiva selezione, menu
+contestuale e evidenziazione del tocco: sono tutti gesti che il browser si
+prenderebbe per sé, annullando la premuta a metà. E siccome `preventDefault()`
+toglie anche lo stato `:active`, il pulsante premuto si illumina da sé
+(classe `.on`).
+
 ### Telecamera e sfondo
 
 La vista è larga quanto la mappa (30 celle) e alta uno schermo (16 celle): la

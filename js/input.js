@@ -11,6 +11,11 @@
     action: ["x", "X", "z", "Z", "Control"]
   };
 
+  // Un dito non cade mai esattamente dentro il pulsante: si accetta un margine,
+  // più generoso in verticale perché il pollice arriva dal basso.
+  const SLOP_X = 6;
+  const SLOP_Y = 14;
+
   class Input {
     constructor() {
       this.left = this.right = this.up = this.down = false;
@@ -20,6 +25,12 @@
       this.actionPressed = false;
       this._held = {};
       this._touch = { left: false, right: false, down: false, jump: false, action: false };
+      this._mouse = null;         // pulsante premuto col mouse, se c'è
+      this._buttons = [];         // pulsanti a schermo, per il test di collisione
+      this._rects = null;         // loro posizioni, ricalcolate solo se serve
+      this._lastDir = "right";    // se sinistra e destra sono premute insieme
+      this._rawLeft = false;
+      this._rawRight = false;
       this.onAction = null;
       this.onKey = null;
       this.onGesture = null;
@@ -39,17 +50,47 @@
       window.addEventListener("keyup", (ev) => this._set(ev.key, false));
       window.addEventListener("blur", () => { this._held = {}; this._sync(); });
 
-      document.querySelectorAll("[data-btn]").forEach((btn) => {
-        const name = btn.dataset.btn;
-        const on = (ev) => { this._gesture(); this._touch[name] = true; this._sync(); ev.preventDefault(); };
-        const off = (ev) => { this._touch[name] = false; this._sync(); ev.preventDefault(); };
-        btn.addEventListener("touchstart", on, { passive: false });
-        btn.addEventListener("touchend", off, { passive: false });
-        btn.addEventListener("touchcancel", off, { passive: false });
-        btn.addEventListener("mousedown", on);
-        btn.addEventListener("mouseup", off);
-        btn.addEventListener("mouseleave", off);
-      });
+      this._buttons = Array.from(document.querySelectorAll("[data-btn]"));
+      const forget = () => { this._rects = null; };
+      window.addEventListener("resize", forget);
+      window.addEventListener("orientationchange", () => setTimeout(forget, 300));
+      window.addEventListener("scroll", forget, true);
+      if (window.visualViewport) window.visualViewport.addEventListener("resize", forget);
+
+      // I pulsanti a schermo non si ascoltano uno per uno: a ogni evento si
+      // ricalcola lo stato da tutti i tocchi vivi. Così far scorrere il pollice
+      // da ◀ a ▶ funziona (il tocco resta legato al primo pulsante, quindi il
+      // secondo non riceverebbe mai un touchstart) e un touchend perso non può
+      // lasciare un tasto incollato.
+      const touched = (ev) => {
+        const held = { left: false, right: false, down: false, jump: false, action: false };
+        for (const t of ev.touches) {
+          const name = this._hit(t.clientX, t.clientY);
+          if (name) held[name] = true;
+        }
+        const onPad = ev.touches.length > 0 && Object.keys(held).some((k) => held[k]);
+        this._touch = held;
+        this._sync();
+        // touchcancel non è annullabile: chiederlo fa solo rumore in console
+        if ((onPad || this._wasOnPad) && ev.cancelable) ev.preventDefault();
+        this._wasOnPad = onPad;
+      };
+      for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"]) {
+        window.addEventListener(type, (ev) => {
+          if (type === "touchstart") this._gesture();
+          touched(ev);
+        }, { passive: false });
+      }
+
+      // col mouse (prova da scrivania) basta il pulsante sotto il puntatore
+      const mouse = (ev, down) => {
+        this._mouse = down ? this._hit(ev.clientX, ev.clientY) : null;
+        if (down) this._gesture();
+        this._sync();
+      };
+      window.addEventListener("mousedown", (ev) => mouse(ev, true));
+      window.addEventListener("mouseup", (ev) => mouse(ev, false));
+      window.addEventListener("mouseleave", (ev) => mouse(ev, false));
 
       if (target) {
         target.addEventListener("touchstart", (ev) => {
@@ -79,17 +120,69 @@
       return false;
     }
 
+    /** Posizioni dei pulsanti: leggerle a ogni touchmove costerebbe un reflow. */
+    _measure() {
+      this._rects = this._buttons.map((btn) => {
+        const r = btn.getBoundingClientRect();
+        return { name: btn.dataset.btn, l: r.left, r: r.right, t: r.top, b: r.bottom,
+                 cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2,
+                 live: r.width > 0 && r.height > 0 };      // il pad è nascosto da CSS
+      });
+      return this._rects;
+    }
+
+    /** Pulsante a schermo sotto il punto dato: il più vicino, con un margine. */
+    _hit(x, y) {
+      const rects = this._rects || this._measure();
+      let best = null, bestD = Infinity;
+      for (const r of rects) {
+        if (!r.live) continue;
+        if (x < r.l - SLOP_X || x > r.r + SLOP_X) continue;
+        if (y < r.t - SLOP_Y || y > r.b + SLOP_Y) continue;
+        const d = Math.hypot(x - r.cx, y - r.cy);
+        if (d < bestD) { bestD = d; best = r.name; }
+      }
+      return best;
+    }
+
+    _pressed(name) {
+      return this._touch[name] || this._mouse === name;
+    }
+
+    /** Il pulsante si accende davvero quando è premuto: senza, col tocco
+        preventDefault toglie anche il :active e non si capisce se ha preso. */
+    _paint() {
+      for (const btn of this._buttons) {
+        btn.classList.toggle("on", !!this._pressed(btn.dataset.btn));
+      }
+    }
+
     _sync() {
-      this.left = this._any(MAP.left) || this._touch.left;
-      this.right = this._any(MAP.right) || this._touch.right;
-      this.up = this._any(MAP.up) || this._touch.up;
-      this.down = this._any(MAP.down) || this._touch.down;
-      const jumpNow = this._any(MAP.jump) || this._touch.jump;
+      const left = this._any(MAP.left) || this._pressed("left");
+      const right = this._any(MAP.right) || this._pressed("right");
+      // premute insieme, vince l'ultima arrivata: altrimenti si annullerebbero
+      // e il nano resterebbe fermo proprio mentre si preme un tasto
+      if (left && !this._rawLeft) this._lastDir = "left";
+      if (right && !this._rawRight) this._lastDir = "right";
+      this._rawLeft = left;
+      this._rawRight = right;
+      if (left && right) {
+        this.left = this._lastDir === "left";
+        this.right = this._lastDir === "right";
+      } else {
+        this.left = left;
+        this.right = right;
+      }
+
+      this.up = this._any(MAP.up) || this._pressed("up");
+      this.down = this._any(MAP.down) || this._pressed("down");
+      const jumpNow = this._any(MAP.jump) || this._pressed("jump");
       if (jumpNow && !this.jump) this.jumpPressed = true;
       this.jump = jumpNow;
-      const now = this._any(MAP.action) || this._touch.action;
+      const now = this._any(MAP.action) || this._pressed("action");
       if (now && !this.action) this.actionPressed = true;
       this.action = now;
+      this._paint();
     }
 
     /** A fine frame: "appena premuto" vale un solo frame. */

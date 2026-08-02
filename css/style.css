@@ -95,6 +95,16 @@ canvas#game {
 }
 
 /* ------------------------------------------------------------------ comandi */
+/* Niente scorrimento, zoom, selezione o menu contestuale sui comandi: sono
+   gesti che il browser si prende per sé, annullando il tocco a metà premuta. */
+.controls, .pad, .controls button, .pad button {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 
 .controls button {
@@ -165,7 +175,12 @@ kbd {
     background: linear-gradient(#ffd764, #f0a830);
     border-color: #fff3c4;
   }
-  .pad button:active { filter: brightness(1.25); }
+  .pad button:active,
+  .pad button.on {
+    filter: brightness(1.3);
+    border-color: var(--brass);
+    transform: translateY(1px);
+  }
   .hint { display: none; }
 }
 
