@@ -118,6 +118,12 @@
       this.dwarf = new window.Dwarf(this.arena);
       this.imps = this.arena.spawns.map((s) =>
         new window.Imp(this.arena, s.x, s.y, this.arena.impSpeed, this.arena.stun));
+      // piattaforme mobili e blocchi irti: l'arena tiene le prime perché anche
+      // i blocchi devono potervi salire sopra
+      this.arena.movers = this.arena.moverSpecs.map((s) =>
+        new window.Movers.MovingPlatform(this.arena, s.tx, s.ty, s.tiles, s.speed));
+      this.blocks = this.arena.blockSpawns.map((b) =>
+        new window.Movers.Block(this.arena, b.tx, b.ty));
       this.total = this.imps.length;
       this.boxed = 0;
       this.hearts = HEARTS;
@@ -183,6 +189,15 @@
         carried.stun = this.arena.stun;
         this.burst(carried.x, carried.y, "255,226,90", 8, 110);
       }
+      // i blocchi irti si spostano solo così: a martellate, mai a mani nude
+      for (const b of this.blocks) {
+        const k = Math.hypot((b.cx - point.x) / window.Dwarf.SHOCK_RX,
+                             (b.cy - point.y) / window.Dwarf.SHOCK_RY);
+        if (k > 1) continue;
+        b.push(point.x, 250 * (1 - k) + 120);
+        this.dust(b.cx, b.y + b.h, 6);
+      }
+
       let hit = 0;
       for (const imp of this.imps) {
         if (imp.boxed || imp.state === "carried") continue;
@@ -254,10 +269,16 @@
 
     updatePlay(dt) {
       const dwarf = this.dwarf;
+      // prima le piattaforme: chi ci sta sopra si sposta con loro
+      const movers = this.arena.movers;
+      for (const m of movers) m.update(dt, movers);
       dwarf.update(dt, this.input, this);
+      for (const b of this.blocks) b.update(dt, this.blocks);
       for (const imp of this.imps) if (!imp.boxed) imp.update(dt, dwarf);
 
       this.checkCarry();
+      this.checkSpikes();
+      if (this.state !== "play") return;
       this.checkContact();
       this.checkMachine();
       this.updateCamera(dt);
@@ -331,6 +352,19 @@
       }
     }
 
+    /** Le punte non perdonano: un solo contatto e la cava ricomincia. */
+    checkSpikes() {
+      for (const b of this.blocks) {
+        if (!b.touches(this.dwarf)) continue;
+        this.hearts = 0;
+        this.burst(this.dwarf.cx, this.dwarf.cy, "255,85,102", 20, 200);
+        this.dust(b.cx, b.cy, 10);
+        window.Sfx.hurt();
+        this.lose("Le punte del blocco non perdonano");
+        return;
+      }
+    }
+
     checkMachine() {
       const dwarf = this.dwarf;
       const imp = dwarf.carrying;
@@ -347,8 +381,9 @@
       this.burst(gate.x, gate.y, "186,244,255", 16, 170);
     }
 
-    lose() {
+    lose(reason) {
       window.Sfx.lose();
+      this.deathMsg = reason || "Gli spiritelli hanno avuto la meglio";
       this.setState("dead", 1.6);
     }
 
@@ -381,8 +416,10 @@
       this.drawBackdrop(ctx);                       // parallasse: non scorre con la mappa
       ctx.translate(-Math.round(this.cam.x), -Math.round(this.cam.y));
       this.arena.drawMap(ctx);
+      for (const m of this.arena.movers) m.draw(ctx);
       this.drawPortal(ctx);
       this.arena.drawMachine(ctx, this.time);
+      for (const b of this.blocks) b.draw(ctx);
       for (const imp of this.imps) if (!imp.boxed) imp.draw(ctx, this.time);
       if (this.state !== "dead") this.dwarf.draw(ctx);
       this.drawWaves(ctx);
@@ -566,7 +603,7 @@
     drawDead(ctx) {
       const W = this.vw, cy = (this.vh + HUD) / 2;
       this.panel(ctx, cy - 60, 120);
-      this.wrapped(ctx, "Gli spiritelli hanno avuto la meglio", W / 2, cy - 15,
+      this.wrapped(ctx, this.deathMsg || "Gli spiritelli hanno avuto la meglio", W / 2, cy - 15,
         W - 50, Math.min(30, W / 26), "#ffe89b");
       text(ctx, "si ricomincia la cava…", W / 2, cy + 27, 17, "rgba(255,246,226,0.9)", "center");
     }

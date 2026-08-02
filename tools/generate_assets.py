@@ -246,6 +246,63 @@ def build_tiles():
     return sheet
 
 
+def moving_platform():
+    """Piattaforma mobile: tre pezzi (testa, corpo, coda) con telaio di ferro."""
+    sheet = Image.new("RGBA", (3 * TILE, TILE), (0, 0, 0, 0))
+    for i in range(3):
+        img = canvas(TILE, TILE)
+        d = ImageDraw.Draw(img)
+        left, right = (i == 0), (i == 2)
+        d.rounded_rectangle([0 if not left else s(2), s(1), s(TILE) if not right else s(TILE - 2), s(13)],
+                            radius=s(3), fill=P.IRON + (255,))
+        d.rounded_rectangle([0 if not left else s(4), s(3), s(TILE) if not right else s(TILE - 4), s(9)],
+                            radius=s(2), fill=P.WOOD + (255,))
+        d.rectangle([0 if not left else s(4), s(3), s(TILE) if not right else s(TILE - 4), s(5)],
+                    fill=P.WOOD_LIGHT + (255,))
+        # bulloni alle estremità, chevron nel mezzo: si vede che scorre
+        if left or right:
+            cx = 6 if left else TILE - 6
+            ellipse(d, cx, 7, 2.2, 2.2, P.IRON_LIGHT)
+        else:
+            for k in range(2):
+                x = 8 + k * 12
+                d.polygon([(s(x), s(5)), (s(x + 5), s(8)), (s(x), s(11)), (s(x + 2), s(8))],
+                          fill=P.IRON_LIGHT + (220,))
+        d.rectangle([0 if not left else s(2), s(12), s(TILE) if not right else s(TILE - 2), s(14)],
+                    fill=P.IRON_DARK + (255,))
+        sheet.alpha_composite(down(img, TILE, TILE), (i * TILE, 0))
+    return sheet
+
+
+def hazard_block():
+    """Blocco irto di punte: si sposta a martellate, ma toccarlo è fatale."""
+    size = 40
+    img = canvas(size, size)
+    d = ImageDraw.Draw(img)
+    body = (86, 78, 104)
+    edge = (58, 52, 72)
+    top = (126, 116, 148)
+    # punte su tutti i lati
+    for k in range(4):
+        for j in range(3):
+            t = 8 + j * 12
+            if k == 0:
+                pts = [(t - 4, 8), (t, 1), (t + 4, 8)]
+            elif k == 1:
+                pts = [(t - 4, size - 8), (t, size - 1), (t + 4, size - 8)]
+            elif k == 2:
+                pts = [(8, t - 4), (1, t), (8, t + 4)]
+            else:
+                pts = [(size - 8, t - 4), (size - 1, t), (size - 8, t + 4)]
+            d.polygon([(s(px), s(py)) for px, py in pts], fill=edge + (255,))
+    d.rounded_rectangle([s(6), s(6), s(size - 6), s(size - 6)], radius=s(3), fill=body + (255,))
+    d.rounded_rectangle([s(6), s(6), s(size - 6), s(size - 14)], radius=s(3), fill=top + (200,))
+    d.rounded_rectangle([s(11), s(11), s(size - 11), s(size - 11)], radius=s(2), fill=edge + (255,))
+    for bx, by in ((9, 9), (size - 9, 9), (9, size - 9), (size - 9, size - 9)):
+        ellipse(d, bx, by, 2.0, 2.0, P.IRON_LIGHT)
+    return down(img, size, size)
+
+
 # --------------------------------------------------------------------------
 # il nano, di profilo
 # --------------------------------------------------------------------------
@@ -605,6 +662,8 @@ def main():
     print("Generazione asset di Martello & Scatole...")
     save(build_backdrop(), "backdrop.png")
     save(build_tiles(), "tiles.png")
+    save(moving_platform(), "movplat.png")
+    save(hazard_block(), "hazard.png")
     save(build_dwarf(), "dwarf.png")
     save(build_imps(), "imps.png")
     save(build_machine(), "machine.png")

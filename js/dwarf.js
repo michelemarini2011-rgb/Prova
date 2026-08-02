@@ -54,6 +54,7 @@
       this.carrying = null;
       this.invuln = 0;
       this.hitFlash = 0;
+      this.rider = null;         // piattaforma mobile che lo sta trasportando
     }
 
     get cx() { return this.x + this.w / 2; }
@@ -79,6 +80,10 @@
       if (this.invuln > 0) this.invuln -= dt;
       if (this.hitFlash > 0) this.hitFlash -= dt;
       if (this.dropTimer > 0) this.dropTimer -= dt;
+
+      // trasportato dalla piattaforma sotto i piedi (che si è già mossa)
+      if (this.rider && this.rider.dx) this.moveX(this.rider.dx);
+      this.rider = null;
 
       // il martello si usa sempre: trascinando rinnova il torpore
       if (input.actionPressed && !this.swinging) {
@@ -185,6 +190,14 @@
           this.vy = 0;
           return;
         }
+      }
+
+      // niente terreno: resta la piattaforma mobile, su cui si sale dall'alto
+      const m = window.Movers.landOn(this, prevBottom, this.arena.movers);
+      if (m) {
+        this.onGround = true;
+        this.onOneWay = true;      // col basso + salto ci si lascia cadere
+        this.rider = m;
       }
     }
 

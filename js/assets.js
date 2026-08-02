@@ -9,6 +9,8 @@
     imps: "assets/imps.png",
     machine: "assets/machine.png",
     crate: "assets/crate.png",
+    movplat: "assets/movplat.png",
+    hazard: "assets/hazard.png",
     portal: "assets/portal.png",
     icons: "assets/icons.png",
     logo: "assets/logo.png"

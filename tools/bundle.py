@@ -25,6 +25,7 @@ JS_FILES = [
     "js/audio.js",
     "js/input.js",
     "js/arena.js",
+    "js/platforms.js",
     "js/dwarf.js",
     "js/imps.js",
     "js/game.js",

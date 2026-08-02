@@ -38,6 +38,21 @@ Su telefono e tablet compaiono le frecce e i pulsanti *salta* e *martella*.
 5. Inscatolati tutti, **si apre il portale**: attraversalo per la cava
    successiva.
 
+### Zattere e punte
+
+Fra un'asse e l'altra ci sono **piattaforme mobili**: zattere di ferro che
+scorrono da sole a destra e a sinistra e si fermano solo quando trovano il bordo
+della mappa, un blocco di roccia o **un'altra piattaforma** — due che si
+incontrano rimbalzano l'una sull'altra. Chi ci sale sopra viene trasportato: il
+nano, e anche gli spiritelli storditi che gli scivolano di mano. Con ↓ + salto
+ci si lascia cadere, come dalle assi.
+
+E poi ci sono i **blocchi irti di punte**. Toccarli è fatale — non si perde un
+cuore, si ricomincia la cava — quindi non si spingono a mani nude: si spostano
+**a martellate**, con la stessa onda d'urto che stordisce gli spiritelli. Un
+blocco cade, rotola, si ferma; e se finisce su una piattaforma mobile ci
+viaggia sopra, arrivando dove non te lo aspetti.
+
 Le mappe si sviluppano **in altezza**: larghe uno schermo, alte più schermi (due
 il primo livello, tre gli ultimi). Il macchinario sta in fondo, gli spiritelli
 presidiano i piani alti — quindi il giro è: sali, stordisci, e riportali giù. Uno
@@ -50,8 +65,9 @@ giù**: è lì che fanno male. Tre cuori; se se ne libera uno mentre lo trasport
 prendi solo uno spintone — la punizione è doverlo rincorrere. A cuori finiti si
 ricomincia la cava.
 
-Le quattro cave hanno 3, 4, 5 e 6 spiritelli, sempre più veloci, e il torpore
-scende da 9 a 6 secondi.
+Le quattro cave hanno 4, 5, 6 e 7 spiritelli, sempre più veloci, e il torpore
+scende da 9 a 6 secondi. Crescono anche le piattaforme mobili (da 1 a 5, sempre
+più svelte) e i blocchi irti (da 1 a 4).
 
 ## Come è fatto
 
@@ -63,6 +79,7 @@ js/assets.js            caricamento delle immagini
 js/audio.js             sintesi dei suoni
 js/input.js             tastiera e comandi a schermo
 js/arena.js             griglia, collisioni, macchinario, disegno della cava
+js/platforms.js         piattaforme mobili e blocchi irti
 js/dwarf.js             il nano: corsa, salto, martellata, trascinamento
 js/imps.js              spiritelli: volo, picchiata, stordimento, fuga
 js/game.js              stati, onda d'urto, consegna, portale, interfaccia
@@ -134,6 +151,8 @@ premoltiplicato** (senza, i bordi sfumati si sporcano di nero).
 | `dwarf.png` | nano di profilo: fermo, corsa (6 fotogrammi), martellata (4), salto, caduta, traino |
 | `imps.png` | spiritello: in volo, stordito, in picchiata |
 | `machine.png` | macchinario inscatolatore, fermo e in funzione |
+| `movplat.png` | piattaforma mobile in tre pezzi: testa, corpo ripetibile, coda |
+| `hazard.png` | blocco irto di punte |
 | `portal.png`, `crate.png`, `icons.png` | portale, cassa, cuori e martello |
 | `logo.png`, `favicon.png` | logo e icona |
 
@@ -147,8 +166,15 @@ livello più alto basta aggiungere righe in cima.
 #  terreno   =  asse di legno (ci si sale da sotto)   .  aria
 P  partenza  S  spiritello (in volo)  M  angolo del macchinario  O  portale
 b  cespuglio   r  sasso   f  fiori
-!!! stordimento=<secondi> velocita=<px al secondo>
+~  piattaforma mobile (2-6 celle)     x  blocco irto di punte
+!!! stordimento=<secondi> velocita=<px/s spiritelli> piattaforme=<px/s>
 ```
+
+Una piattaforma mobile è un tratto orizzontale di `~`: nel gioco corre finché non
+incontra il bordo, un `#` o un'altra piattaforma, quindi i `#` isolati sulla sua
+riga fanno da respingenti e ne definiscono la corsa. Due tratti sulla stessa riga
+si rimbalzano a vicenda. Un `x` cade fin dove trova appoggio — anche su una
+piattaforma mobile, e allora viaggia con lei.
 
 Dopo averlo modificato:
 
@@ -159,13 +185,17 @@ python3 tools/build_arenas.py
 Lo script controlla che le righe siano un multiplo di 16, che partenza e portale
 poggino sul terreno, che il macchinario ci stia per intero e appoggi, e che ci
 siano una sola partenza, un solo macchinario, un solo portale e almeno uno
-spiritello.
+spiritello. Delle piattaforme mobili verifica che siano lunghe da 2 a 6 celle,
+che abbiano spazio per muoversi e che nella loro corsa non ci sia altro che aria
+— altrimenti attraverserebbero assi e decorazioni.
 
 Soprattutto fa una **verifica di raggiungibilità**: ricava i ripiani calpestabili,
 li collega fra loro con gli archi che il salto del nano consente davvero (fino a
 3 celle in su e 3 di distanza, discese fino a 4) e controlla per BFS che dalla
 partenza si arrivi a ogni spiritello, al macchinario e al portale. È il controllo
-che ha scovato tre spiritelli irraggiungibili nella quarta cava.
+che ha scovato tre spiritelli irraggiungibili nella quarta cava. Una piattaforma
+mobile vi entra come un ripiano largo quanto la sua corsa: prima o poi passa da
+ogni colonna che attraversa.
 
 Poi riscrive `js/arenas.js`.
 

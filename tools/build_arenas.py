@@ -15,7 +15,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COLS, SCREEN = 30, 16      # la mappa è larga uno schermo e alta N schermi
-LEGAL = set("#.=PSMObrf")
+LEGAL = set("#.=PSMObrf~x")
+SOLIDS = "#M"              # ciò che ferma una piattaforma mobile
 
 
 def parse(path):
@@ -26,7 +27,8 @@ def parse(path):
             if line.startswith("# "):
                 continue
             if line.startswith("=== "):
-                cur = {"name": line[4:].strip(), "hint": "", "stun": 5.0, "speed": 50, "rows": []}
+                cur = {"name": line[4:].strip(), "hint": "", "stun": 5.0, "speed": 50,
+                       "platSpeed": 60, "rows": []}
                 arenas.append(cur)
             elif line.startswith("--- ") and cur:
                 cur["hint"] = line[4:].strip()
@@ -37,6 +39,8 @@ def parse(path):
                         cur["stun"] = float(value)
                     elif key == "velocita":
                         cur["speed"] = float(value)
+                    elif key == "piattaforme":
+                        cur["platSpeed"] = float(value)
             elif cur is not None and line.strip():
                 cur["rows"].append(line)
     return arenas
@@ -47,6 +51,30 @@ def parse(path):
 JUMP_UP = 3
 JUMP_ACROSS = 3
 FALL_ACROSS = 4
+
+
+def movers(rows):
+    """Piattaforme mobili: ogni tratto di '~' con la corsa che può percorrere."""
+    out = []
+    for y, row in enumerate(rows):
+        x = 0
+        while x < len(row):
+            if row[x] != "~":
+                x += 1
+                continue
+            x0 = x
+            while x < len(row) and row[x] == "~":
+                x += 1
+            x1 = x - 1
+            # corsa: fino al primo muro (o a un'altra piattaforma) a destra e a sinistra
+            left = x0
+            while left > 0 and row[left - 1] not in SOLIDS and row[left - 1] != "~":
+                left -= 1
+            right = x1
+            while right < len(row) - 1 and row[right + 1] not in SOLIDS and row[right + 1] != "~":
+                right += 1
+            out.append({"y": y, "x0": x0, "x1": x1, "left": left, "right": right})
+    return out
 
 
 def platforms(rows):
@@ -63,6 +91,10 @@ def platforms(rows):
             while x < len(row) and row[x] in "#=M" and (y == 0 or rows[y - 1][x] not in "#M"):
                 x += 1
             out.append({"y": y, "x0": x0, "x1": x - 1})
+    # una piattaforma mobile è un ripiano largo quanto la sua corsa: prima o poi
+    # passa da ogni colonna che attraversa, quindi per la raggiungibilità vale tutta
+    for m in movers(rows):
+        out.append({"y": m["y"], "x0": m["left"], "x1": m["right"]})
     return out
 
 
@@ -183,6 +215,35 @@ def check(arenas):
             elif rows[y + 4][x] != "#":
                 errors.append(f"{name}: il macchinario non poggia sul terreno")
 
+        # piattaforme mobili: devono essere lunghe il giusto e avere spazio per correre
+        a["movers"] = 0
+        for m in movers(rows):
+            a["movers"] += 1
+            length = m["x1"] - m["x0"] + 1
+            run = m["right"] - m["left"] + 1
+            if not 2 <= length <= 6:
+                errors.append(f"{name}: piattaforma mobile di {length} celle "
+                              f"(riga {m['y']}), devono essere da 2 a 6")
+            if run <= length:
+                errors.append(f"{name}: la piattaforma mobile in ({m['x0']},{m['y']}) "
+                              "è incastrata, non ha spazio per muoversi")
+            # nel gioco la piattaforma si ferma solo sui muri: nella sua corsa
+            # non deve esserci nient'altro, o attraverserebbe assi e decorazioni
+            corridor = set(rows[m["y"]][m["left"]:m["right"] + 1])
+            if corridor - set(".~"):
+                errors.append(f"{name}: la corsa della piattaforma in ({m['x0']},{m['y']}) "
+                              f"incontra {sorted(corridor - set('.~'))}")
+
+        # blocchi irti: devono poter cadere su qualcosa dentro la mappa
+        a["blocks"] = 0
+        for y, row in enumerate(rows):
+            for x, ch in enumerate(row):
+                if ch != "x":
+                    continue
+                a["blocks"] += 1
+                if y + 1 >= len(rows):
+                    errors.append(f"{name}: blocco in ({x},{y}) sull'ultima riga")
+
         errors.extend(check_reachability(name, rows))
     return errors
 
@@ -196,7 +257,8 @@ def main():
         sys.exit(1)
 
     payload = [{"name": a["name"], "hint": a["hint"], "stun": a["stun"],
-                "speed": a["speed"], "rows": a["rows"]} for a in arenas]
+                "speed": a["speed"], "platSpeed": a["platSpeed"], "rows": a["rows"]}
+               for a in arenas]
     js = ("// GENERATO da tools/build_arenas.py a partire da tools/arenas.txt — non modificare a mano.\n"
           "window.ARENAS = " + json.dumps(payload, ensure_ascii=False, indent=1) + ";\n")
     with open(os.path.join(ROOT, "js", "arenas.js"), "w", encoding="utf-8") as fh:
@@ -204,7 +266,8 @@ def main():
 
     for a in arenas:
         print(f"  {a['name']:24s} {a['screens']} schermi ({len(a['rows'])} righe) · "
-              f"{a['imps']} spiritelli · torpore {a['stun']}s · velocità {a['speed']}")
+              f"{a['imps']} spiritelli · {a['movers']} piattaforme mobili · "
+              f"{a['blocks']} blocchi · torpore {a['stun']}s · velocità {a['speed']}")
     print("js/arenas.js aggiornato.")
 
 

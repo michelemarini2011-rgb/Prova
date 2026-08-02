@@ -9,7 +9,10 @@
 
   const SOLID = "#";
   const ONEWAY = "=";
+  const MOVER = "~";            // tratto di piattaforma mobile
+  const BLOCK = "x";            // blocco irto: si sposta a martellate, uccide
   const DECOR = { b: 1, r: 2, f: 3 };   // colonne nella riga 4 di tiles.png
+  const MOVER_SPEED = 52;       // px al secondo, se l'arena non dice altro
 
   class Arena {
     constructor(data) {
@@ -27,6 +30,10 @@
       this.spawns = [];
       this.machine = null;
       this.portalSpot = { x: this.w / 2, y: TILE * 13 };
+      this.moverSpecs = [];        // piattaforme mobili lette dalla mappa
+      this.blockSpawns = [];       // blocchi irti
+      this.movers = [];            // istanze vive, riempite dalla regia
+      this.moverSpeed = data.platSpeed || MOVER_SPEED;
       this.scan();
       this.bake();
     }
@@ -62,6 +69,14 @@
           if (c === "P") this.start = { x: cx, y: (ty + 1) * TILE };
           else if (c === "S") this.spawns.push({ x: cx, y: ty * TILE + TILE / 2 });
           else if (c === "O") this.portalSpot = { x: cx, y: (ty + 1) * TILE };
+          else if (c === BLOCK) this.blockSpawns.push({ tx, ty });
+          else if (c === MOVER && this.at(tx - 1, ty) !== MOVER) {
+            let n = 1;
+            while (this.at(tx + n, ty) === MOVER) n += 1;
+            // una sì e una no partono verso sinistra: il traffico non è mai uniforme
+            const dir = this.moverSpecs.length % 2 === 0 ? 1 : -1;
+            this.moverSpecs.push({ tx, ty, tiles: n, speed: this.moverSpeed * dir });
+          }
           else if (c === "M") {
             this.machine = {
               x: tx * TILE, y: ty * TILE, w: MACHINE, h: MACHINE,
