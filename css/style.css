@@ -135,31 +135,32 @@ kbd {
 @media (hover: none) and (pointer: coarse) {
   body { padding: 4px; }
   .stage { gap: 6px; }
-  .controls { order: -1; gap: 6px; }
-  .controls button { padding: 5px 12px; font-size: 12px; }
+  .controls { order: -1; gap: 6px; width: 100%; }
+  .controls button { flex: 1 1 0; min-width: 0; padding: 6px 4px; font-size: 12px; }
+
+  /* Griglia elastica: i tasti si dividono la larghezza, non la superano mai. */
   .pad {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1.45fr 1.45fr;
+    gap: 6px;
     width: 100%;
-    max-width: 680px;
-    gap: 14px;
     flex: 0 0 auto;
   }
-  .dpad, .acts { display: flex; gap: 8px; align-items: center; }
+  .dpad, .acts { display: contents; }
   .pad button {
-    min-width: 58px;
-    height: 50px;
-    font-size: 17px;
+    width: 100%;
+    min-width: 0;
+    height: 56px;
+    padding: 0;
+    font-size: 16px;
     color: #5a3a18;
     background: rgba(255, 255, 255, .92);
     border: 2px solid rgba(224, 149, 46, .5);
     border-radius: 12px;
   }
   .pad .smash, .pad .jump {
-    min-width: 92px;
-    height: 70px;
-    font-size: 16px;
+    height: 62px;
+    font-size: 15px;
     color: #4a2a08;
     background: linear-gradient(#ffd764, #f0a830);
     border-color: #fff3c4;
@@ -168,10 +169,11 @@ kbd {
   .hint { display: none; }
 }
 
-/* Schermo basso e largo: comandi più compatti per lasciare spazio al gioco. */
+/* Schermo basso e largo: tasti più bassi, resta spazio per il gioco. */
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
-  .pad button { height: 42px; min-width: 50px; font-size: 15px; }
-  .pad .smash, .pad .jump { height: 54px; min-width: 78px; font-size: 14px; }
+  .pad button { height: 44px; font-size: 15px; }
+  .pad .smash, .pad .jump { height: 48px; font-size: 14px; }
+  .controls button { padding: 4px 4px; font-size: 11px; }
 }
 
 @media (max-height: 560px) { .hint { display: none; } }

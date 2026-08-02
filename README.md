@@ -100,8 +100,12 @@ la telecamera segue il nano anche in orizzontale.
 
 In pratica: su un monitor si vedono tutte e 30 le colonne con la cella a ~42 px;
 su un telefono in verticale se ne vedono 15 su 28 righe con la cella a ~25 px,
-il doppio di prima. Su telefono i comandi a schermo si stringono e la pagina
-lascia al gioco tutta l'altezza che avanza.
+il doppio di prima.
+
+I comandi a schermo stanno su una **griglia elastica** a cinque colonne
+(`1fr 1fr 1fr 1.45fr 1.45fr`): i tasti si dividono la larghezza disponibile
+invece di avere misure fisse, così non escono mai dallo schermo — nemmeno su un
+telefono da 320 px. La pagina lascia al gioco tutta l'altezza che avanza.
 
 ### Telecamera e sfondo
 
