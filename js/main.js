@@ -35,6 +35,17 @@
           if (key === "m" || key === "M") toggleSound();
         };
 
+        // la vista si adatta allo spazio disponibile e all'orientamento
+        const screen = document.querySelector(".screen") || canvas.parentElement;
+        const fit = () => {
+          const r = screen.getBoundingClientRect();
+          game.resize(Math.max(260, Math.round(r.width)), Math.max(220, Math.round(r.height)));
+        };
+        fit();
+        window.addEventListener("resize", fit);
+        window.addEventListener("orientationchange", () => setTimeout(fit, 250));
+        if (window.visualViewport) window.visualViewport.addEventListener("resize", fit);
+
         const pause = document.getElementById("btn-pause");
         if (pause) pause.addEventListener("click", () => game.togglePause());
         const restart = document.getElementById("btn-restart");

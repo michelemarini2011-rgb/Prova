@@ -3,10 +3,15 @@
   "use strict";
 
   const TILE = window.Arena.TILE;
-  const W = 960;
   const HUD = 28;
-  const VIEW_H = window.Arena.SCREEN_ROWS * TILE;   // 512: altezza di uno schermo
-  const H = HUD + VIEW_H;                          // 28 + 512 = 540
+  const MAP_W = window.Arena.COLS * TILE;           // 960: larghezza del mondo
+  const SCREEN_H = window.Arena.SCREEN_ROWS * TILE; // 512: uno schermo di altezza
+
+  // La vista si adatta alla forma dello schermo: invece di rimpicciolire tutto
+  // su un telefono in verticale, si mostra meno mondo alla stessa scala.
+  const MIN_SCALE = 0.82;        // sotto questa scala il gioco è illeggibile
+  const MIN_VIEW_W = 15 * TILE;  // non meno di 15 celle in larghezza
+  const MIN_VIEW_H = 9 * TILE;   // non meno di 9 celle in altezza
 
   const SERIF = 'Georgia, "Palatino Linotype", "Times New Roman", serif';
   const SANS = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
@@ -44,8 +49,6 @@
 
   class Game {
     constructor(canvas, input) {
-      canvas.width = W;
-      canvas.height = H;
       this.canvas = canvas;
       this.ctx = canvas.getContext("2d");
       this.input = input;
@@ -61,13 +64,43 @@
       this.best = Number(store.get("martello-record") || 0);
       this.waves = [];
       this.particles = [];
-      this.cam = { y: 0 };
+      this.cam = { x: 0, y: 0 };
+      this.vw = MAP_W;
+      this.vh = SCREEN_H;
+      this.resize(MAP_W, SCREEN_H);
 
       input.onAction = () => this.confirm();
       input.onKey = (key) => {
         if (key === "p" || key === "P") this.togglePause();
         if (key === "r" || key === "R") this.restart();
       };
+    }
+
+    /**
+     * Sceglie quanta parte del mondo mostrare, dato lo spazio disponibile in
+     * pixel CSS. Su schermi larghi si vede tutto; su un telefono in verticale
+     * la vista si restringe e si allunga, mantenendo i personaggi leggibili.
+     */
+    resize(availW, availH) {
+      this.boxW = availW;
+      this.boxH = availH;
+      const mapH = this.arena ? this.arena.h : Infinity;
+      const aspect = availW / Math.max(1, availH);
+      // altezza di vista che conserva la forma della scatola (HUD compreso)
+      const heightFor = (w) => Math.round(w / aspect) - HUD;
+
+      let vw = MAP_W;
+      if (heightFor(vw) > mapH) vw = (mapH + HUD) * aspect;   // la mappa finisce prima
+      if (availW / vw < MIN_SCALE) vw = availW / MIN_SCALE;   // altrimenti sarebbe minuscolo
+      vw = Math.max(MIN_VIEW_W, Math.min(MAP_W, Math.round(vw)));
+      const vh = Math.max(MIN_VIEW_H, Math.min(mapH, heightFor(vw)));
+
+      this.vw = vw;
+      this.vh = vh;
+      this.canvas.width = vw;
+      this.canvas.height = vh + HUD;
+      this.ctx.imageSmoothingEnabled = true;
+      if (this.dwarf) this.updateCamera(0, true);
     }
 
     // -------------------------------------------------------------- partita
@@ -92,6 +125,7 @@
       this.particles.length = 0;
       this.portalOpen = false;
       this.portalT = 0;
+      this.resize(this.boxW, this.boxH);
       this.updateCamera(0, true);
       this.setState("intro", 2.8);
     }
@@ -245,11 +279,15 @@
       }
     }
 
-    /** La mappa è alta N schermi: la vista insegue il nano in verticale. */
+    /** La vista insegue il nano, restando dentro i bordi della mappa. */
     updateCamera(dt, snap) {
-      const maxY = Math.max(0, this.arena.h - VIEW_H);
-      const target = Math.max(0, Math.min(maxY, this.dwarf.cy - VIEW_H * 0.52));
-      this.cam.y = snap ? target : this.cam.y + (target - this.cam.y) * Math.min(1, dt * 5.5);
+      const maxX = Math.max(0, this.arena.w - this.vw);
+      const maxY = Math.max(0, this.arena.h - this.vh);
+      const tx = Math.max(0, Math.min(maxX, this.dwarf.cx - this.vw * 0.5));
+      const ty = Math.max(0, Math.min(maxY, this.dwarf.cy - this.vh * 0.55));
+      const k = Math.min(1, dt * 5.5);
+      this.cam.x = snap ? tx : this.cam.x + (tx - this.cam.x) * k;
+      this.cam.y = snap ? ty : this.cam.y + (ty - this.cam.y) * k;
     }
 
     checkCarry() {
@@ -334,13 +372,14 @@
     // -------------------------------------------------------------- disegno
     draw() {
       const ctx = this.ctx;
+      const W = this.vw, H = this.vh + HUD;
       ctx.clearRect(0, 0, W, H);
       if (this.state === "title") { this.drawTitle(ctx); return; }
 
       ctx.save();
       ctx.translate(0, HUD);
       this.drawBackdrop(ctx);                       // parallasse: non scorre con la mappa
-      ctx.translate(0, -Math.round(this.cam.y));
+      ctx.translate(-Math.round(this.cam.x), -Math.round(this.cam.y));
       this.arena.drawMap(ctx);
       this.drawPortal(ctx);
       this.arena.drawMachine(ctx, this.time);
@@ -361,40 +400,52 @@
     /** Il fondale scorre di poco: in cima resta cielo, in fondo l'orizzonte. */
     drawBackdrop(ctx) {
       const bd = window.Assets.img.backdrop;
-      const maxY = Math.max(1, this.arena.h - VIEW_H);
-      const t = Math.max(0, Math.min(1, this.cam.y / maxY));
-      ctx.drawImage(bd, 0, Math.round(-t * (bd.height - VIEW_H)));
+      const maxX = Math.max(1, this.arena.w - this.vw);
+      const maxY = Math.max(1, this.arena.h - this.vh);
+      const tx = Math.max(0, Math.min(1, this.cam.x / maxX));
+      const ty = Math.max(0, Math.min(1, this.cam.y / maxY));
+      // ingrandito quanto basta a coprire la vista, qualunque sia la sua forma
+      const sc = Math.max(this.vw / bd.width, this.vh / bd.height);
+      const dw = bd.width * sc, dh = bd.height * sc;
+      ctx.drawImage(bd, Math.round(-tx * Math.max(0, dw - this.vw)),
+        Math.round(-ty * Math.max(0, dh - this.vh)), Math.ceil(dw), Math.ceil(dh));
     }
 
     /** Frecce ai bordi per quello che serve ma è fuori schermo. */
     drawMarkers(ctx) {
       if (this.state !== "play") return;
+      const W = this.vw, VH = this.vh;
       const marks = [];
       if (this.dwarf.carrying) {
         const m = this.arena.machine.intake;
-        marks.push({ y: m.y, color: "#3aa8b8", label: "macchinario" });
+        marks.push({ x: m.x, y: m.y, color: "#3aa8b8", label: "macchinario" });
       }
       if (this.portalOpen && this.portalT >= 1) {
-        marks.push({ y: this.arena.portalSpot.y - 60, color: "#f0a830", label: "portale" });
+        const p = this.arena.portalSpot;
+        marks.push({ x: p.x, y: p.y - 60, color: "#f0a830", label: "portale" });
       }
       for (const mk of marks) {
-        const sy = mk.y - this.cam.y;
-        if (sy > 20 && sy < VIEW_H - 20) continue;         // già visibile
-        const down = sy >= VIEW_H - 20;
-        const y = HUD + (down ? VIEW_H - 26 : 26);
+        const sx = mk.x - this.cam.x, sy = mk.y - this.cam.y;
+        const outX = sx < 26 ? -1 : sx > W - 26 ? 1 : 0;
+        const outY = sy < 26 ? -1 : sy > VH - 26 ? 1 : 0;
+        if (!outX && !outY) continue;
+        const px = Math.max(30, Math.min(W - 30, sx));
+        const py = HUD + Math.max(30, Math.min(VH - 30, sy));
+        const ang = Math.atan2(outY, outX);
         ctx.save();
-        ctx.globalAlpha = 0.72 + 0.28 * Math.sin(this.time * 5);
+        ctx.globalAlpha = 0.75 + 0.25 * Math.sin(this.time * 5);
+        ctx.translate(px, py);
+        ctx.rotate(ang);
         ctx.fillStyle = mk.color;
-        ctx.strokeStyle = "rgba(255,255,255,0.9)";
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(255,255,255,0.95)";
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.moveTo(W - 34, y + (down ? 10 : -10));
-        ctx.lineTo(W - 48, y + (down ? -6 : 6));
-        ctx.lineTo(W - 20, y + (down ? -6 : 6));
+        ctx.moveTo(14, 0);
+        ctx.lineTo(-8, -11);
+        ctx.lineTo(-8, 11);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        outlined(ctx, mk.label, W - 58, y, 15, "#ffffff", "right");
         ctx.restore();
       }
     }
@@ -443,6 +494,7 @@
     }
 
     drawHud(ctx) {
+      const W = this.vw, H = this.vh + HUD;
       const icons = window.Assets.img.icons;
       ctx.fillStyle = "#5a3a20";
       ctx.fillRect(0, 0, W, HUD);
@@ -454,20 +506,29 @@
       }
       ctx.drawImage(icons, 64, 0, 32, 32, 96, 3, 22, 22);
       text(ctx, this.boxed + " / " + this.total, 124, HUD / 2 + 1, 16, "#ffe89b");
-      text(ctx, "martellate " + this.hammers + "   ·   " + Math.floor(this.elapsed) + "s",
-        W / 2, HUD / 2 + 1, 14, "rgba(255,240,214,0.8)", "center");
-      text(ctx, "Cava " + (this.index + 1) + " — " + this.arena.name, W - 10, HUD / 2 + 1,
-        15, "#ffe89b", "right", SERIF);
+      const secs = Math.floor(this.elapsed);
+      if (W >= 640) {
+        text(ctx, "martellate " + this.hammers + "   ·   " + secs + "s",
+          W / 2, HUD / 2 + 1, 14, "rgba(255,240,214,0.8)", "center");
+        text(ctx, "Cava " + (this.index + 1) + " — " + this.arena.name, W - 10, HUD / 2 + 1,
+          15, "#ffe89b", "right", SERIF);
+      } else {
+        // vista stretta: solo l'essenziale, senza scritte che si accavallano
+        text(ctx, "Cava " + (this.index + 1) + "  ·  " + secs + "s", W - 10, HUD / 2 + 1,
+          14, "#ffe89b", "right", SERIF);
+      }
 
       if (this.portalOpen && this.state === "play") {
         ctx.save();
         ctx.globalAlpha = 0.6 + 0.4 * Math.sin(this.time * 4);
-        outlined(ctx, "il portale è aperto — attraversalo", W / 2, H - 26, 20, "#fff5cf", "center", SERIF);
+        const msg = W >= 560 ? "il portale è aperto — attraversalo" : "portale aperto";
+        outlined(ctx, msg, W / 2, H - 26, Math.min(20, W / 22), "#fff5cf", "center", SERIF);
         ctx.restore();
       }
     }
 
     panel(ctx, y, h) {
+      const W = this.vw;
       ctx.fillStyle = "rgba(92,52,26,0.9)";
       ctx.fillRect(0, y, W, h);
       ctx.fillStyle = "rgba(255,226,150,0.7)";
@@ -476,47 +537,74 @@
     }
 
     drawCard(ctx) {
-      this.panel(ctx, 170, 190);
-      text(ctx, "Cava " + (this.index + 1), W / 2, 208, 18, "#b6f0a0", "center");
-      text(ctx, this.arena.name, W / 2, 250, 38, "#ffe89b", "center", SERIF);
-      text(ctx, this.arena.hint, W / 2, 302, 17, "rgba(255,246,226,0.92)", "center");
-      text(ctx, "spiritelli da inscatolare: " + this.total, W / 2, 336, 16, "#b6f0a0", "center");
+      const W = this.vw, cy = (this.vh + HUD) / 2;
+      const big = Math.min(38, W / 22);
+      this.panel(ctx, cy - 95, 190);
+      text(ctx, "Cava " + (this.index + 1), W / 2, cy - 57, 18, "#b6f0a0", "center");
+      text(ctx, this.arena.name, W / 2, cy - 15, big, "#ffe89b", "center", SERIF);
+      this.wrapped(ctx, this.arena.hint, W / 2, cy + 37, W - 60, 17, "rgba(255,246,226,0.92)");
+      text(ctx, "spiritelli da inscatolare: " + this.total, W / 2, cy + 71, 16, "#b6f0a0", "center");
+    }
+
+    /** Testo a capo automatico: i suggerimenti stanno anche su schermo stretto. */
+    wrapped(ctx, str, x, y, maxW, size, color, outline) {
+      ctx.font = size + "px " + SANS;
+      const words = String(str).split(" ");
+      const lines = [];
+      let line = "";
+      for (const w of words) {
+        const test = line ? line + " " + w : w;
+        if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+        else line = test;
+      }
+      if (line) lines.push(line);
+      const start = y - (lines.length - 1) * size * 0.7;
+      const put = outline ? outlined : text;
+      lines.forEach((l, i) => put(ctx, l, x, start + i * size * 1.35, size, color, "center"));
     }
 
     drawDead(ctx) {
-      this.panel(ctx, 210, 120);
-      text(ctx, "Gli spiritelli hanno avuto la meglio", W / 2, 250, 30, "#ffe89b", "center", SERIF);
-      text(ctx, "si ricomincia la cava…", W / 2, 292, 17, "rgba(255,246,226,0.9)", "center");
+      const W = this.vw, cy = (this.vh + HUD) / 2;
+      this.panel(ctx, cy - 60, 120);
+      this.wrapped(ctx, "Gli spiritelli hanno avuto la meglio", W / 2, cy - 15,
+        W - 50, Math.min(30, W / 26), "#ffe89b");
+      text(ctx, "si ricomincia la cava…", W / 2, cy + 27, 17, "rgba(255,246,226,0.9)", "center");
     }
 
     drawFinale(ctx) {
+      const W = this.vw, H = this.vh + HUD, cy = H / 2;
       ctx.drawImage(window.Assets.img.backdrop, 0, 0, W, H);
       ctx.fillStyle = "rgba(92,52,26,0.72)";
       ctx.fillRect(0, 0, W, H);
-      outlined(ctx, "Tutti inscatolati", W / 2, 160, 46, "#ffe89b", "center", SERIF);
-      text(ctx, "Quattro cave ripulite in " + Math.round(this.elapsed) + " secondi, con "
-        + this.hammers + " martellate.", W / 2, 226, 20, "#fff6e2", "center");
+      outlined(ctx, "Tutti inscatolati", W / 2, cy - 105, Math.min(46, W / 16), "#ffe89b", "center", SERIF);
+      this.wrapped(ctx, "Quattro cave ripulite in " + Math.round(this.elapsed)
+        + " secondi, con " + this.hammers + " martellate.", W / 2, cy - 40, W - 60, 20, "#fff6e2");
       if (this.best > 0) {
-        text(ctx, "Record: " + this.best + " secondi", W / 2, 262, 17, "#b6f0a0", "center");
+        text(ctx, "Record: " + this.best + " secondi", W / 2, cy + 5, 17, "#b6f0a0", "center");
       }
       if (Math.floor(this.time * 2) % 2 === 0) {
-        text(ctx, "INVIO per ricominciare", W / 2, 340, 19, "#fff5cf", "center");
+        text(ctx, "INVIO o tocca per ricominciare", W / 2, cy + 75, 19, "#fff5cf", "center");
       }
     }
 
     drawPause(ctx) {
+      const W = this.vw, H = this.vh + HUD, cy = H / 2;
       ctx.fillStyle = "rgba(92,52,26,0.72)";
       ctx.fillRect(0, 0, W, H);
-      outlined(ctx, "Pausa", W / 2, 244, 42, "#ffe89b", "center", SERIF);
-      text(ctx, "P per riprendere · R per ricominciare la cava", W / 2, 296, 17,
-        "#fff6e2", "center");
+      outlined(ctx, "Pausa", W / 2, cy - 20, Math.min(42, W / 14), "#ffe89b", "center", SERIF);
+      this.wrapped(ctx, "P per riprendere · R per ricominciare la cava", W / 2, cy + 32,
+        W - 50, 17, "#fff6e2");
     }
 
     drawTitle(ctx) {
       const img = window.Assets.img;
-      ctx.drawImage(img.backdrop, 0, -(img.backdrop.height - H));
+      const W = this.vw, H = this.vh + HUD;
+      const bd = img.backdrop;
+      const sc = Math.max(W / bd.width, H / bd.height);
+      ctx.drawImage(bd, 0, Math.round(H - bd.height * sc), Math.ceil(bd.width * sc),
+        Math.ceil(bd.height * sc));
 
-      // una striscia di terreno in fondo
+      // striscia di terreno in fondo
       const tiles = img.tiles;
       for (let x = 0; x < W; x += TILE) {
         const v = (x / TILE) % 2;
@@ -525,35 +613,49 @@
         ctx.drawImage(tiles, 7 * TILE, sy, TILE, TILE, x, H - TILE, TILE, TILE);
       }
 
-      ctx.drawImage(img.logo, (W - img.logo.width) / 2, 40);
+      const logoW = Math.min(img.logo.width, W - 30);
+      const logoH = logoW * img.logo.height / img.logo.width;
+      const logoY = Math.max(10, H * 0.06);
+      ctx.drawImage(img.logo, (W - logoW) / 2, logoY, logoW, logoH);
 
       // il nano martella, lo spiritello rimbalza
       const t = this.time;
       const beat = t % 1.8;
       const hammering = beat < 0.7;
       const frame = hammering ? Math.min(3, Math.floor(beat / 0.175)) : Math.floor(t * 6) % 2;
-      const row = hammering ? 2 : 0;
-      const fx = 300;
-      ctx.drawImage(img.dwarf, frame * 64, row * 64, 64, 64, fx, H - TILE * 2 - 58, 64, 64);
+      const fx = Math.max(20, W * 0.18);
+      ctx.drawImage(img.dwarf, frame * 64, (hammering ? 2 : 0) * 64, 64, 64,
+        fx, H - TILE * 2 - 58, 64, 64);
       const k = hammering ? 0 : Math.min(1, (beat - 0.7) / 0.7);
-      const ix = fx + 70 + k * 90;
-      const iy = H - TILE * 2 - 46 - Math.sin(k * Math.PI) * 60;
-      ctx.drawImage(img.imps, (Math.floor(t * 6) % 4) * 48, (hammering ? 0 : 48), 48, 48, ix, iy, 48, 48);
-      ctx.drawImage(img.machine, 0, 0, 128, 128, 640, H - TILE * 2 - 122, 128, 128);
-
-      if (Math.floor(t * 2) % 2 === 0) {
-        outlined(ctx, "PREMI INVIO PER COMINCIARE", W / 2, 252, 24, "#fff5cf", "center");
+      ctx.drawImage(img.imps, (Math.floor(t * 6) % 4) * 48, (hammering ? 0 : 48), 48, 48,
+        fx + 70 + k * 80, H - TILE * 2 - 46 - Math.sin(k * Math.PI) * 60, 48, 48);
+      if (W > 620) {
+        ctx.drawImage(img.machine, 0, 0, 128, 128, W - 200, H - TILE * 2 - 122, 128, 128);
       }
-      outlined(ctx, "← → corri · SPAZIO salta · X martella", W / 2, 292, 18, "#ffffff", "center");
-      outlined(ctx, "P pausa · R ricomincia la cava · M audio", W / 2, 318, 16, "#f6e6cc", "center");
+
+      let y = logoY + logoH + Math.max(24, H * 0.06);
+      if (Math.floor(t * 2) % 2 === 0) {
+        const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+        outlined(ctx, touch ? "TOCCA PER COMINCIARE" : "PREMI INVIO PER COMINCIARE",
+          W / 2, y, Math.min(24, W / 17), "#fff5cf", "center");
+      }
+      y += 42;
+      const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      if (touch) {
+        this.wrapped(ctx, "frecce per correre · SALTA · MARTELLA",
+          W / 2, y, W - 40, 17, "#ffffff", true);
+      } else {
+        this.wrapped(ctx, "← → corri · SPAZIO salta · X martella", W / 2, y, W - 40, 17, "#ffffff", true);
+        y += 32;
+        this.wrapped(ctx, "P pausa · R ricomincia la cava · M audio", W / 2, y, W - 40, 15, "#f6e6cc", true);
+      }
       if (this.best > 0) {
-        outlined(ctx, "Record: " + this.best + " secondi", W / 2, 344, 17, "#d8ffc0", "center");
+        outlined(ctx, "Record: " + this.best + " secondi", W / 2, y + 32, 16, "#d8ffc0", "center");
       }
     }
   }
 
-  Game.WIDTH = W;
-  Game.HEIGHT = H;
   Game.HUD = HUD;
+  Game.MAP_W = MAP_W;
   window.Game = Game;
 })();

@@ -89,6 +89,20 @@ di 2 celle** per volta (64 px), ben dentro i 96 px del salto.
 Il torpore e la velocità degli spiritelli sono per cava, dentro
 `tools/arenas.txt`.
 
+### La vista si adatta allo schermo
+
+Il canvas non ha più una forma fissa: `Game.resize()` misura lo spazio
+disponibile in pixel CSS e sceglie **quanta parte del mondo mostrare**, tenendo
+la stessa forma della finestra così non resta nessuna banda vuota. Se il gioco
+risulterebbe più piccolo di 0,82 pixel per pixel di mondo, invece di rimpicciolire
+tutto si restringe la vista — al minimo 15 celle di larghezza e 9 di altezza — e
+la telecamera segue il nano anche in orizzontale.
+
+In pratica: su un monitor si vedono tutte e 30 le colonne con la cella a ~42 px;
+su un telefono in verticale se ne vedono 15 su 28 righe con la cella a ~25 px,
+il doppio di prima. Su telefono i comandi a schermo si stringono e la pagina
+lascia al gioco tutta l'altezza che avanza.
+
 ### Telecamera e sfondo
 
 La vista è larga quanto la mappa (30 celle) e alta uno schermo (16 celle): la

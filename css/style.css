@@ -63,15 +63,28 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  max-height: 100%;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  max-width: 1400px;
+}
+
+/* Il riquadro di gioco prende tutto lo spazio che avanza: il canvas si
+   ridimensiona da solo alla forma dello schermo (vedi Game.resize). */
+.screen {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 canvas#game {
   display: block;
-  aspect-ratio: 16 / 9;
-  width: min(calc(100vw - 20px), calc((100dvh - 150px) * 16 / 9));
-  height: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   background: var(--sky);
   border-radius: 10px;
   border: 3px solid #ffffff;
@@ -120,12 +133,18 @@ kbd {
 .pad { display: none; }
 
 @media (hover: none) and (pointer: coarse) {
+  body { padding: 4px; }
+  .stage { gap: 6px; }
+  .controls { order: -1; gap: 6px; }
+  .controls button { padding: 5px 12px; font-size: 12px; }
   .pad {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    width: min(100vw - 20px, 620px);
-    gap: 18px;
+    width: 100%;
+    max-width: 680px;
+    gap: 14px;
+    flex: 0 0 auto;
   }
   .dpad, .acts { display: flex; gap: 8px; align-items: center; }
   .pad button {
@@ -147,7 +166,12 @@ kbd {
   }
   .pad button:active { filter: brightness(1.25); }
   .hint { display: none; }
-  canvas#game { width: min(calc(100vw - 20px), calc((100dvh - 240px) * 16 / 9)); }
+}
+
+/* Schermo basso e largo: comandi più compatti per lasciare spazio al gioco. */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .pad button { height: 42px; min-width: 50px; font-size: 15px; }
+  .pad .smash, .pad .jump { height: 54px; min-width: 78px; font-size: 14px; }
 }
 
 @media (max-height: 560px) { .hint { display: none; } }
