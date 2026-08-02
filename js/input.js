@@ -27,7 +27,8 @@
       this._touch = { left: false, right: false, down: false, jump: false, action: false };
       this._mouse = null;         // pulsante premuto col mouse, se c'è
       this._buttons = [];         // pulsanti a schermo, per il test di collisione
-      this._rects = null;         // loro posizioni, ricalcolate solo se serve
+      this._rects = null;         // loro posizioni, rilette a ogni premuta
+      this._padIds = new Set();   // dita partite da un pulsante
       this._lastDir = "right";    // se sinistra e destra sono premute insieme
       this._rawLeft = false;
       this._rawRight = false;
@@ -51,11 +52,6 @@
       window.addEventListener("blur", () => { this._held = {}; this._sync(); });
 
       this._buttons = Array.from(document.querySelectorAll("[data-btn]"));
-      const forget = () => { this._rects = null; };
-      window.addEventListener("resize", forget);
-      window.addEventListener("orientationchange", () => setTimeout(forget, 300));
-      window.addEventListener("scroll", forget, true);
-      if (window.visualViewport) window.visualViewport.addEventListener("resize", forget);
 
       // I pulsanti a schermo non si ascoltano uno per uno: a ogni evento si
       // ricalcola lo stato da tutti i tocchi vivi. Così far scorrere il pollice
@@ -63,17 +59,33 @@
       // secondo non riceverebbe mai un touchstart) e un touchend perso non può
       // lasciare un tasto incollato.
       const touched = (ev) => {
+        // Le posizioni si rileggono a ogni premuta, non solo quando il browser
+        // ci avvisa: la barra degli indirizzi che compare o scompare sposta i
+        // pulsanti senza che arrivi sempre un resize, e con misure vecchie il
+        // tocco finirebbe accanto al tasto invece che dentro.
+        if (ev.type === "touchstart") this._measure();
+
         const held = { left: false, right: false, down: false, jump: false, action: false };
         for (const t of ev.touches) {
           const name = this._hit(t.clientX, t.clientY);
           if (name) held[name] = true;
         }
-        const onPad = ev.touches.length > 0 && Object.keys(held).some((k) => held[k]);
         this._touch = held;
         this._sync();
-        // touchcancel non è annullabile: chiederlo fa solo rumore in console
-        if ((onPad || this._wasOnPad) && ev.cancelable) ev.preventDefault();
-        this._wasOnPad = onPad;
+
+        // Si annulla il gesto solo per le dita partite dal pad: un dito
+        // appoggiato su una freccia non deve impedire di toccare pausa o lo
+        // schermo con l'altra mano. (touchcancel non è annullabile.)
+        let mine = false;
+        for (const t of ev.changedTouches) {
+          if (ev.type === "touchstart") {
+            if (this._hit(t.clientX, t.clientY)) { this._padIds.add(t.identifier); mine = true; }
+          } else if (this._padIds.has(t.identifier)) {
+            mine = true;
+            if (ev.type !== "touchmove") this._padIds.delete(t.identifier);
+          }
+        }
+        if (mine && ev.cancelable) ev.preventDefault();
       };
       for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"]) {
         window.addEventListener(type, (ev) => {
@@ -84,6 +96,7 @@
 
       // col mouse (prova da scrivania) basta il pulsante sotto il puntatore
       const mouse = (ev, down) => {
+        if (down) this._measure();
         this._mouse = down ? this._hit(ev.clientX, ev.clientY) : null;
         if (down) this._gesture();
         this._sync();

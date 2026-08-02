@@ -140,11 +140,19 @@ il pollice sull'altro tasto prima di aver staccato il primo — **vince l'ultima
 arrivata** invece di annullarsi a vicenda; mollandola torna a valere quella
 ancora premuta. Vale anche per la tastiera.
 
-Sui comandi il CSS mette `touch-action: none` e disattiva selezione, menu
-contestuale e evidenziazione del tocco: sono tutti gesti che il browser si
-prenderebbe per sé, annullando la premuta a metà. E siccome `preventDefault()`
-toglie anche lo stato `:active`, il pulsante premuto si illumina da sé
-(classe `.on`).
+Le posizioni dei pulsanti si **rileggono a ogni premuta**, non solo quando arriva
+un `resize`: su un telefono la barra degli indirizzi che compare o scompare
+sposta il pad di 50-100 px senza che l'evento arrivi sempre, e con misure vecchie
+il tocco finirebbe accanto al tasto invece che dentro. Fra una premuta e l'altra
+le misure restano in cache, altrimenti ogni `touchmove` costerebbe un reflow.
+
+Il gesto viene annullato **solo per le dita partite da un pulsante del pad** (se
+ne tengono gli identificatori): un dito appoggiato su una freccia non deve
+impedire all'altra mano di toccare pausa o lo schermo. Sui comandi il CSS mette
+`touch-action: none` e disattiva selezione, menu contestuale e evidenziazione del
+tocco: sono tutti gesti che il browser si prenderebbe per sé, annullando la
+premuta a metà. E siccome `preventDefault()` toglie anche lo stato `:active`, il
+pulsante premuto si illumina da sé (classe `.on`).
 
 ### Telecamera e sfondo
 
