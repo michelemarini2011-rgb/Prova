@@ -1,4 +1,4 @@
-/* Comandi: tastiera e pulsanti a schermo, con la stessa interfaccia. */
+/* Comandi: tastiera, pulsanti a schermo e joypad, con la stessa interfaccia. */
 (function () {
   "use strict";
 
@@ -16,6 +16,22 @@
   const SLOP_X = 6;
   const SLOP_Y = 14;
 
+  // ------------------------------------------------------------------ joypad
+  // Un pad Bluetooth accoppiato col sistema il browser lo vede come un gamepad
+  // qualunque: non c'è niente di specifico per il Bluetooth. Gli indici sono
+  // quelli della disposizione "standard", in cui il browser normalizza i pad
+  // per posizione — il tasto 0 è sempre quello in basso, comunque si chiami.
+  const PAD = {
+    left: { keys: [14], axis: 0, dir: -1 },      // croce sinistra o levetta
+    right: { keys: [15], axis: 0, dir: 1 },
+    up: { keys: [12], axis: 1, dir: -1 },
+    down: { keys: [13], axis: 1, dir: 1 },
+    jump: { keys: [0] },                          // il tasto in basso (A)
+    action: { keys: [1, 2, 3, 5, 7] }             // gli altri frontali e i dorsali destri
+  };
+  const DEADZONE = 0.4;      // sotto, la levetta è considerata a riposo
+  const PAD_PAUSE = 9;       // start
+
   class Input {
     constructor() {
       this.left = this.right = this.up = this.down = false;
@@ -32,6 +48,12 @@
       this._lastDir = "right";    // se sinistra e destra sono premute insieme
       this._rawLeft = false;
       this._rawRight = false;
+      this._pad = { left: false, right: false, up: false, down: false,
+                    jump: false, action: false };
+      this._padWasJump = false;
+      this._padWasPause = false;
+      this._padHeld = false;      // c'è qualcosa premuto sul pad
+      this.padActive = false;     // c'è un joypad collegato e lo si sta usando
       this.onAction = null;
       this.onKey = null;
       this.onGesture = null;
@@ -105,6 +127,17 @@
       window.addEventListener("mouseup", (ev) => mouse(ev, false));
       window.addEventListener("mouseleave", (ev) => mouse(ev, false));
 
+      // Il joypad si legge a ogni fotogramma (vedi poll), ma il browser avvisa
+      // quando compare: i browser lo tengono nascosto finché non si preme un
+      // tasto, quindi questo evento arriva proprio al primo comando.
+      window.addEventListener("gamepadconnected", () => { this.padActive = true; });
+      window.addEventListener("gamepaddisconnected", () => {
+        this.padActive = false;
+        this._pad = { left: false, right: false, up: false, down: false,
+                      jump: false, action: false };
+        this._sync();
+      });
+
       if (target) {
         target.addEventListener("touchstart", (ev) => {
           this._gesture();
@@ -159,7 +192,58 @@
     }
 
     _pressed(name) {
-      return this._touch[name] || this._mouse === name;
+      return this._touch[name] || this._mouse === name || this._pad[name];
+    }
+
+    /**
+     * Il joypad non manda eventi: va letto a ogni fotogramma. Lo chiama il
+     * ciclo di gioco prima di aggiornare il mondo.
+     */
+    poll() {
+      if (!navigator.getGamepads) return;
+      let pads;
+      try { pads = navigator.getGamepads(); } catch (e) { return; }
+
+      const held = { left: false, right: false, up: false, down: false,
+                     jump: false, action: false };
+      let connected = false, pause = false;
+      for (const gp of pads) {
+        if (!gp || !gp.connected) continue;
+        connected = true;
+        for (const name in PAD) {
+          const m = PAD[name];
+          for (const k of m.keys) {
+            const b = gp.buttons[k];
+            if (b && (b.pressed || b.value > 0.5)) held[name] = true;
+          }
+          if (m.axis !== undefined) {
+            const v = gp.axes[m.axis];
+            if (typeof v === "number" && v * m.dir > DEADZONE) held[name] = true;
+          }
+        }
+        const p = gp.buttons[PAD_PAUSE];
+        if (p && p.pressed) pause = true;
+      }
+      // Niente pad e niente rimasto premuto: si esce senza toccare lo stato. Se
+      // invece qualcosa era premuto quando il pad si è scollegato bisogna
+      // passare di qui a rilasciarlo, o resterebbe incollato.
+      if (!connected && !this.padActive && !this._padHeld) return;
+      this.padActive = connected;
+
+      this._padHeld = false;
+      for (const name in held) if (held[name]) this._padHeld = true;
+
+      // il tasto in basso vale anche come "conferma", come la barra spaziatrice
+      if (held.jump && !this._padWasJump) {
+        this._gesture();
+        if (this.onAction) this.onAction();
+      }
+      this._padWasJump = held.jump;
+      if (pause && !this._padWasPause && this.onKey) this.onKey("p");
+      this._padWasPause = pause;
+
+      this._pad = held;
+      this._sync();
     }
 
     /** Il pulsante si accende davvero quando è premuto: senza, col tocco

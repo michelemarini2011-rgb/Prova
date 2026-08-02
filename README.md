@@ -21,6 +21,25 @@ Apri `index.html` in un browser — basta un doppio clic, non serve un server.
 
 Su telefono e tablet compaiono le frecce e i pulsanti *salta* e *martella*.
 
+### Con un joypad
+
+Funziona anche con un **joypad**, compresi quelli Bluetooth: una volta accoppiato
+col sistema il browser lo vede come un gamepad qualunque, non serve fare altro.
+Premi un tasto e il gioco se ne accorge — i browser tengono il pad nascosto
+finché non lo si tocca, per non lasciarsi identificare da un sito.
+
+| Comando | Azione |
+|---|---|
+| croce direzionale o levetta sinistra | corri, e ↓ per scendere dalle assi |
+| **A** (il tasto in basso) | salta — e conferma nei menù |
+| **B**, **X**, **Y**, dorsale o grilletto destro | martella |
+| **Start** | pausa |
+
+I tasti sono quelli della disposizione *standard*, in cui il browser normalizza i
+pad **per posizione**: "A" è sempre quello in basso, comunque lo chiami il tuo
+joypad. La levetta ha una zona morta a 0,4 così non parte da sola. Tastiera,
+tocco e joypad restano attivi tutti insieme.
+
 ### Il giro completo
 
 1. **Martella vicino a uno spiritello.** Non si colpisce direttamente: il
@@ -77,7 +96,7 @@ css/style.css           interfaccia e layout responsivo
 js/arenas.js            arene (file generato)
 js/assets.js            caricamento delle immagini
 js/audio.js             sintesi dei suoni
-js/input.js             tastiera e comandi a schermo
+js/input.js             tastiera, comandi a schermo e joypad
 js/arena.js             griglia, collisioni, macchinario, disegno della cava
 js/platforms.js         piattaforme mobili e blocchi irti
 js/dwarf.js             il nano: corsa, salto, martellata, trascinamento
@@ -145,6 +164,11 @@ un `resize`: su un telefono la barra degli indirizzi che compare o scompare
 sposta il pad di 50-100 px senza che l'evento arrivi sempre, e con misure vecchie
 il tocco finirebbe accanto al tasto invece che dentro. Fra una premuta e l'altra
 le misure restano in cache, altrimenti ogni `touchmove` costerebbe un reflow.
+
+Il joypad invece **non manda eventi**: va interrogato, quindi `Input.poll()` lo
+legge una volta per fotogramma dal ciclo di gioco e ne ricava lo stato allo
+stesso modo dei tasti. Se il pad si scollega mentre si tiene premuta una
+direzione, quella viene rilasciata invece di restare incollata.
 
 Il gesto viene annullato **solo per le dita partite da un pulsante del pad** (se
 ne tengono gli identificatori): un dito appoggiato su una freccia non deve

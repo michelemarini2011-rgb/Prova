@@ -671,14 +671,21 @@
       }
 
       let y = logoY + logoH + Math.max(24, H * 0.06);
+      const pad = this.input && this.input.padActive;
       if (Math.floor(t * 2) % 2 === 0) {
         const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
-        outlined(ctx, touch ? "TOCCA PER COMINCIARE" : "PREMI INVIO PER COMINCIARE",
-          W / 2, y, Math.min(24, W / 17), "#fff5cf", "center");
+        const invito = pad ? "PREMI A PER COMINCIARE"
+          : touch ? "TOCCA PER COMINCIARE" : "PREMI INVIO PER COMINCIARE";
+        outlined(ctx, invito, W / 2, y, Math.min(24, W / 17), "#fff5cf", "center");
       }
       y += 42;
       const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
-      if (touch) {
+      if (pad) {
+        this.wrapped(ctx, "levetta o croce per correre · A salta · X martella",
+          W / 2, y, W - 40, 17, "#ffffff", true);
+        y += 32;
+        this.wrapped(ctx, "START mette in pausa", W / 2, y, W - 40, 15, "#f6e6cc", true);
+      } else if (touch) {
         this.wrapped(ctx, "frecce per correre · SALTA · MARTELLA",
           W / 2, y, W - 40, 17, "#ffffff", true);
       } else {

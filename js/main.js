@@ -60,6 +60,7 @@
           let dt = (now - last) / 1000;
           last = now;
           if (dt > 0.25) dt = 0.25;
+          input.poll();               // il joypad non manda eventi: si interroga
           acc += dt;
           let guard = 0;
           while (acc >= STEP && guard++ < 60) {
