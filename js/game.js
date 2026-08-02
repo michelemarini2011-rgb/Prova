@@ -5,7 +5,8 @@
   const TILE = window.Arena.TILE;
   const W = 960;
   const HUD = 28;
-  const H = HUD + window.Arena.ROWS * TILE;      // 28 + 512 = 540
+  const VIEW_H = window.Arena.SCREEN_ROWS * TILE;   // 512: altezza di uno schermo
+  const H = HUD + VIEW_H;                          // 28 + 512 = 540
 
   const SERIF = 'Georgia, "Palatino Linotype", "Times New Roman", serif';
   const SANS = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
@@ -60,6 +61,7 @@
       this.best = Number(store.get("martello-record") || 0);
       this.waves = [];
       this.particles = [];
+      this.cam = { y: 0 };
 
       input.onAction = () => this.confirm();
       input.onKey = (key) => {
@@ -90,6 +92,7 @@
       this.particles.length = 0;
       this.portalOpen = false;
       this.portalT = 0;
+      this.updateCamera(0, true);
       this.setState("intro", 2.8);
     }
 
@@ -223,6 +226,7 @@
       this.checkCarry();
       this.checkContact();
       this.checkMachine();
+      this.updateCamera(dt);
       this.updateEffects(dt);
 
       if (this.arena.machine.anim > 0) this.arena.machine.anim -= dt;
@@ -239,6 +243,13 @@
           this.setState("clear", 1.0);
         }
       }
+    }
+
+    /** La mappa è alta N schermi: la vista insegue il nano in verticale. */
+    updateCamera(dt, snap) {
+      const maxY = Math.max(0, this.arena.h - VIEW_H);
+      const target = Math.max(0, Math.min(maxY, this.dwarf.cy - VIEW_H * 0.52));
+      this.cam.y = snap ? target : this.cam.y + (target - this.cam.y) * Math.min(1, dt * 5.5);
     }
 
     checkCarry() {
@@ -328,7 +339,9 @@
 
       ctx.save();
       ctx.translate(0, HUD);
-      this.arena.drawScene(ctx);
+      this.drawBackdrop(ctx);                       // parallasse: non scorre con la mappa
+      ctx.translate(0, -Math.round(this.cam.y));
+      this.arena.drawMap(ctx);
       this.drawPortal(ctx);
       this.arena.drawMachine(ctx, this.time);
       for (const imp of this.imps) if (!imp.boxed) imp.draw(ctx, this.time);
@@ -337,11 +350,53 @@
       this.drawParticles(ctx);
       ctx.restore();
 
+      this.drawMarkers(ctx);
       this.drawHud(ctx);
       if (this.state === "intro") this.drawCard(ctx);
       if (this.state === "dead") this.drawDead(ctx);
       if (this.state === "finale") this.drawFinale(ctx);
       if (this.paused) this.drawPause(ctx);
+    }
+
+    /** Il fondale scorre di poco: in cima resta cielo, in fondo l'orizzonte. */
+    drawBackdrop(ctx) {
+      const bd = window.Assets.img.backdrop;
+      const maxY = Math.max(1, this.arena.h - VIEW_H);
+      const t = Math.max(0, Math.min(1, this.cam.y / maxY));
+      ctx.drawImage(bd, 0, Math.round(-t * (bd.height - VIEW_H)));
+    }
+
+    /** Frecce ai bordi per quello che serve ma è fuori schermo. */
+    drawMarkers(ctx) {
+      if (this.state !== "play") return;
+      const marks = [];
+      if (this.dwarf.carrying) {
+        const m = this.arena.machine.intake;
+        marks.push({ y: m.y, color: "#3aa8b8", label: "macchinario" });
+      }
+      if (this.portalOpen && this.portalT >= 1) {
+        marks.push({ y: this.arena.portalSpot.y - 60, color: "#f0a830", label: "portale" });
+      }
+      for (const mk of marks) {
+        const sy = mk.y - this.cam.y;
+        if (sy > 20 && sy < VIEW_H - 20) continue;         // già visibile
+        const down = sy >= VIEW_H - 20;
+        const y = HUD + (down ? VIEW_H - 26 : 26);
+        ctx.save();
+        ctx.globalAlpha = 0.72 + 0.28 * Math.sin(this.time * 5);
+        ctx.fillStyle = mk.color;
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(W - 34, y + (down ? 10 : -10));
+        ctx.lineTo(W - 48, y + (down ? -6 : 6));
+        ctx.lineTo(W - 20, y + (down ? -6 : 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        outlined(ctx, mk.label, W - 58, y, 15, "#ffffff", "right");
+        ctx.restore();
+      }
     }
 
     drawWaves(ctx) {
@@ -459,7 +514,7 @@
 
     drawTitle(ctx) {
       const img = window.Assets.img;
-      ctx.drawImage(img.backdrop, 0, 0, W, H);
+      ctx.drawImage(img.backdrop, 0, -(img.backdrop.height - H));
 
       // una striscia di terreno in fondo
       const tiles = img.tiles;

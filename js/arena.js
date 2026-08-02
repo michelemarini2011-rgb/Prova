@@ -4,7 +4,7 @@
 
   const TILE = 32;
   const COLS = 30;
-  const ROWS = 16;
+  const SCREEN_ROWS = 16;       // altezza di uno schermo; la mappa ne è alta N
   const MACHINE = 128;          // il macchinario occupa 4x4 celle
 
   const SOLID = "#";
@@ -18,8 +18,10 @@
       this.stun = data.stun;
       this.impSpeed = data.speed;
       this.rows = data.rows;
+      this.nrows = data.rows.length;
+      this.screens = Math.round(this.nrows / SCREEN_ROWS);
       this.w = COLS * TILE;
-      this.h = ROWS * TILE;
+      this.h = this.nrows * TILE;
 
       this.start = { x: TILE * 2, y: TILE * 12 };
       this.spawns = [];
@@ -30,8 +32,8 @@
     }
 
     at(tx, ty) {
-      if (tx < 0 || tx >= COLS) return SOLID;      // i lati chiudono l'arena
-      if (ty < 0 || ty >= ROWS) return ".";
+      if (tx < 0 || tx >= COLS) return SOLID;      // i lati chiudono la mappa
+      if (ty < 0 || ty >= this.nrows) return ".";
       return this.rows[ty][tx];
     }
 
@@ -46,14 +48,14 @@
     surfaceUnder(x, y) {
       const tx = Math.floor(x / TILE);
       let ty = Math.max(0, Math.floor(y / TILE));
-      for (; ty < ROWS; ty++) {
+      for (; ty < this.nrows; ty++) {
         if (this.isSolid(tx, ty) || this.isOneWay(tx, ty)) return ty * TILE;
       }
-      return ROWS * TILE;
+      return this.h;
     }
 
     scan() {
-      for (let ty = 0; ty < ROWS; ty++) {
+      for (let ty = 0; ty < this.nrows; ty++) {
         for (let tx = 0; tx < COLS; tx++) {
           const c = this.at(tx, ty);
           const cx = tx * TILE + TILE / 2;
@@ -80,7 +82,7 @@
       const ctx = cv.getContext("2d");
       const tiles = window.Assets.img.tiles;
 
-      for (let ty = 0; ty < ROWS; ty++) {
+      for (let ty = 0; ty < this.nrows; ty++) {
         for (let tx = 0; tx < COLS; tx++) {
           const c = this.at(tx, ty);
           const x = tx * TILE, y = ty * TILE;
@@ -111,9 +113,8 @@
       return x > m.x && x < m.x + m.w && y > m.y && y < m.y + m.h;
     }
 
-    drawScene(ctx) {
-      ctx.drawImage(window.Assets.img.backdrop, 0, -window.Game.HUD, this.w,
-        window.Assets.img.backdrop.height);
+    /** Il terreno, già disegnato una volta sola: il chiamante ha già traslato. */
+    drawMap(ctx) {
       ctx.drawImage(this.baked, 0, 0);
     }
 
@@ -134,6 +135,6 @@
 
   Arena.TILE = TILE;
   Arena.COLS = COLS;
-  Arena.ROWS = ROWS;
+  Arena.SCREEN_ROWS = SCREEN_ROWS;
   window.Arena = Arena;
 })();

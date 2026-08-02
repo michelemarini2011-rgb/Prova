@@ -25,6 +25,7 @@ TILE = 32          # lato di una cella
 DWARF = 64         # fotogramma del nano
 IMP = 48           # fotogramma dello spiritello
 VIEW_W, VIEW_H = 960, 540
+BACKDROP_H = 760       # più alto della vista: scorre in parallasse
 SS = 4
 
 
@@ -86,23 +87,23 @@ def ellipse(d, cx, cy, rx, ry, fill, alpha=255):
 # fondale: cielo, sole, nuvole, colline
 # --------------------------------------------------------------------------
 def build_backdrop():
-    img = vgradient((VIEW_W, VIEW_H), P.SKY_TOP, P.SKY_BOTTOM).convert("RGBA")
+    """Cielo, sole, nuvole e colline. Più alto della vista: in cima c'è solo
+    cielo, in fondo l'orizzonte, così scorrendo in verticale si vede il cambio."""
+    H = BACKDROP_H
+    img = vgradient((VIEW_W, H), P.SKY_TOP, P.SKY_BOTTOM).convert("RGBA")
 
-    # sole con alone
     sun = Image.new("RGBA", img.size, (0, 0, 0, 0))
     sd = ImageDraw.Draw(sun)
-    sx, sy, sr = 812, 96, 46
+    sx, sy, sr = 812, 110, 46
     sd.ellipse([sx - sr, sy - sr, sx + sr, sy + sr], fill=P.SUN + (255,))
     sun = glow(sun, P.SUN, 34, alpha=150)
     img = Image.alpha_composite(img, sun)
 
     d = ImageDraw.Draw(img)
     rnd = random.Random(12)
-
-    # nuvole a lobi
-    for _ in range(9):
+    for _ in range(13):
         cx = rnd.uniform(20, VIEW_W - 20)
-        cy = rnd.uniform(40, 210)
+        cy = rnd.uniform(40, H - 240)
         scale = rnd.uniform(0.7, 1.5)
         for k in range(6):
             bx = cx + (k - 2.5) * 20 * scale + rnd.uniform(-8, 8)
@@ -115,21 +116,20 @@ def build_backdrop():
             br = rnd.uniform(14, 22) * scale
             d.ellipse([bx - br, by - br * 0.5, bx + br, by + br * 0.5], fill=P.CLOUD_SHADE + (200,))
 
-    # colline lontane e vicine
-    for color, base, amp, freq, alpha in ((P.HILL_FAR, 372, 46, 0.0075, 255),
-                                          (P.HILL_NEAR, 424, 34, 0.0110, 255)):
-        pts = [(0, VIEW_H)]
+    # colline verso il fondo dell'immagine: sono l'orizzonte del piano più basso
+    for color, base, amp, freq in ((P.HILL_FAR, H - 168, 46, 0.0075),
+                                   (P.HILL_NEAR, H - 116, 34, 0.0110)):
+        pts = [(0, H)]
         for x in range(0, VIEW_W + 12, 12):
             y = base - math.sin(x * freq) * amp - math.sin(x * freq * 2.3 + 1) * amp * 0.35
             pts.append((x, y))
-        pts.append((VIEW_W, VIEW_H))
-        d.polygon(pts, fill=color + (alpha,))
+        pts.append((VIEW_W, H))
+        d.polygon(pts, fill=color + (255,))
 
-    # alberelli sulla collina vicina
     rnd2 = random.Random(5)
     for _ in range(16):
         x = rnd2.uniform(10, VIEW_W - 10)
-        y = 424 - math.sin(x * 0.0110) * 34 - math.sin(x * 0.0110 * 2.3 + 1) * 12 + 6
+        y = (H - 116) - math.sin(x * 0.0110) * 34 - math.sin(x * 0.0110 * 2.3 + 1) * 12 + 6
         h = rnd2.uniform(20, 38)
         d.polygon([(x - 2.5, y), (x + 2.5, y), (x + 1.6, y - h * 0.5), (x - 1.6, y - h * 0.5)],
                   fill=P.TREE_DARK + (255,))

@@ -12,6 +12,8 @@
   const HOVER_MIN = 26;          // quanto volteggiano sopra la testa del nano
   const HOVER_MAX = 60;          // sempre dentro la portata verticale del martello
   const DIVE_TIME = 0.8;         // durata di una picchiata
+  const AWARE = 300;             // entro questo raggio si accorge del nano
+  const HOME_R = 70;             // ampiezza del girotondo attorno alla propria zona
   const CEILING = 44;
 
   class Imp {
@@ -94,17 +96,28 @@
         return;
       }
 
-      // volteggia sopra la testa del nano e ogni tanto gli piomba addosso
+      // ognuno presidia la sua zona: si occupa del nano solo se gli passa vicino
       this.bob += dt * 2.6;
       const flee = this.flee > 0;
+      const near = Math.hypot(dwarf.cx - this.x, dwarf.cy - this.y) < AWARE;
       if (this.dive > 0) this.dive -= dt;
-      else if (!flee && (this.diveIn -= dt) <= 0) {
+      else if (near && !flee && (this.diveIn -= dt) <= 0) {
         this.dive = DIVE_TIME;
         this.diveIn = 2.5 + Math.random() * 3.5;
       }
-      const diving = this.dive > 0;
-      const tx = dwarf.cx + (diving ? 0 : Math.sin(this.bob * 0.7 + this.phase) * 46);
-      const ty = diving ? dwarf.cy : dwarf.y - this.hover + Math.sin(this.bob) * 10;
+      const diving = this.dive > 0 && near;
+      let tx, ty;
+      if (diving) {
+        tx = dwarf.cx; ty = dwarf.cy;
+      } else if (near) {
+        // gli volteggia sopra la testa: sempre a tiro di martello
+        tx = dwarf.cx + Math.sin(this.bob * 0.7 + this.phase) * 46;
+        ty = dwarf.y - this.hover + Math.sin(this.bob) * 10;
+      } else {
+        // girotondo sopra la propria zona
+        tx = this.homeX + Math.cos(this.bob * 0.5 + this.phase) * HOME_R;
+        ty = this.homeY + Math.sin(this.bob * 0.7 + this.phase) * 26;
+      }
       const sgn = flee ? -1 : 1;
       this.vx += (tx - this.x) * sgn * dt * (diving ? 5.0 : 2.6);
       this.vy += (ty - this.y) * sgn * dt * (diving ? 6.0 : 3.4);

@@ -1,7 +1,7 @@
 # Martello & Scatole
 
 Un nano con il martello ripulisce dagli spiritelli quattro cave a cielo aperto.
-Platform a **vista laterale** e **schermo fisso** in HTML5 + canvas: nessuna
+Platform a **vista laterale** con **mappe verticali** in HTML5 + canvas: nessuna
 libreria, nessuna risorsa esterna, **tutta la grafica generata proceduralmente**
 da uno script Python incluso nel repository e tutti i suoni sintetizzati con la
 Web Audio API.
@@ -37,6 +37,13 @@ Su telefono e tablet compaiono le frecce e i pulsanti *salta* e *martella*.
    la cassa si accatasta lì accanto.
 5. Inscatolati tutti, **si apre il portale**: attraversalo per la cava
    successiva.
+
+Le mappe si sviluppano **in altezza**: larghe uno schermo, alte più schermi (due
+il primo livello, tre gli ultimi). Il macchinario sta in fondo, gli spiritelli
+presidiano i piani alti — quindi il giro è: sali, stordisci, e riportali giù. Uno
+spiritello stordito **cade**, attraversando le assi di legno: spesso conviene
+farlo cadere e raccoglierlo più in basso. Quando il macchinario o il portale sono
+fuori schermo, una freccia sul bordo indica da che parte stanno.
 
 Gli spiritelli volteggiano sopra la testa del nano e ogni tanto **piombano
 giù**: è lì che fanno male. Tre cuori; se se ne libera uno mentre lo trasporti
@@ -82,11 +89,12 @@ di 2 celle** per volta (64 px), ben dentro i 96 px del salto.
 Il torpore e la velocità degli spiritelli sono per cava, dentro
 `tools/arenas.txt`.
 
-### Sfondo
+### Telecamera e sfondo
 
-`backdrop.png` è un'unica immagine da 960×540 — cielo, sole, nuvole e due file
-di colline con alberelli — generata anch'essa dallo script. Lo schermo è fisso,
-quindi non serve parallasse: il fondale sta dietro e basta.
+La vista è larga quanto la mappa (30 celle) e alta uno schermo (16 celle): la
+telecamera scorre solo in verticale, inseguendo il nano con un piccolo ritardo.
+`backdrop.png` è alto 760 px contro i 512 della vista e scorre in parallasse fra
+i due estremi: in fondo si vede l'orizzonte con le colline, in cima solo cielo.
 
 ## Rigenerare la grafica
 
@@ -103,7 +111,7 @@ premoltiplicato** (senza, i bordi sfumati si sporcano di nero).
 
 | File | Contenuto |
 |---|---|
-| `backdrop.png` | cielo, sole, nuvole, colline |
+| `backdrop.png` | cielo, sole, nuvole, colline (960×760, scorre in parallasse) |
 | `tiles.png` | 16 raccordi del terreno in 2 varianti, asse di legno, cespuglio, sasso, fiori |
 | `dwarf.png` | nano di profilo: fermo, corsa (6 fotogrammi), martellata (4), salto, caduta, traino |
 | `imps.png` | spiritello: in volo, stordito, in picchiata |
@@ -113,7 +121,9 @@ premoltiplicato** (senza, i bordi sfumati si sporcano di nero).
 
 ## Modificare le arene
 
-`tools/arenas.txt` è la sorgente, in ASCII leggibile (30×16 celle):
+`tools/arenas.txt` è la sorgente, in ASCII leggibile: 30 colonne di larghezza e
+un multiplo di 16 righe: **ogni 16 righe è uno schermo di altezza**. Per fare un
+livello più alto basta aggiungere righe in cima.
 
 ```
 #  terreno   =  asse di legno (ci si sale da sotto)   .  aria
@@ -128,9 +138,18 @@ Dopo averlo modificato:
 python3 tools/build_arenas.py
 ```
 
-Lo script controlla che ogni arena abbia 16 righe, il terreno sotto la
-partenza, una sola partenza, un solo macchinario, un solo portale e almeno uno
-spiritello; poi riscrive `js/arenas.js`.
+Lo script controlla che le righe siano un multiplo di 16, che partenza e portale
+poggino sul terreno, che il macchinario ci stia per intero e appoggi, e che ci
+siano una sola partenza, un solo macchinario, un solo portale e almeno uno
+spiritello.
+
+Soprattutto fa una **verifica di raggiungibilità**: ricava i ripiani calpestabili,
+li collega fra loro con gli archi che il salto del nano consente davvero (fino a
+3 celle in su e 3 di distanza, discese fino a 4) e controlla per BFS che dalla
+partenza si arrivi a ogni spiritello, al macchinario e al portale. È il controllo
+che ha scovato tre spiritelli irraggiungibili nella quarta cava.
+
+Poi riscrive `js/arenas.js`.
 
 ## Versione in un file solo
 
