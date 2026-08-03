@@ -11,12 +11,13 @@ riducono i colori alla griglia del VDP e si impacchettano i disegni a 4 bit.
 Produce res/gfx.c e res/gfx.h, più delle anteprime in build/preview per
 controllare a occhio come sono venute le tavolozze.
 """
+import gzip
 import json
 import os
 import sys
 from collections import Counter
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -89,22 +90,54 @@ def wooden(img):
     return out
 
 
+# Il carattere è quello a punti da 8x8 dei terminali (il classico disegno VGA,
+# lo stesso spirito dei giochi dell'epoca), preso dai font della console Linux.
+# Schiacciare un TrueType in otto pixel dava lettere impastate: un carattere
+# disegnato a punti per quella misura è tutt'altra cosa.
+PSF_FONT = "/usr/share/consolefonts/Lat15-VGA8.psf.gz"
+
+
+def load_psf(path):
+    """Legge un font PSF1 da 8 pixel: restituisce i glifi e la mappa unicode."""
+    data = gzip.open(path, "rb").read()
+    if data[:2] != b"\x36\x04":
+        raise ValueError("non e' un font PSF1")
+    mode, height = data[2], data[3]
+    count = 512 if (mode & 1) else 256
+    glyphs = [data[4 + i * height:4 + (i + 1) * height] for i in range(count)]
+
+    table = {}
+    if mode & 2:                      # in coda c'e' l'elenco unicode per glifo
+        pos, glyph, pending = 4 + count * height, 0, []
+        while pos + 1 < len(data) and glyph < count:
+            value = data[pos] | (data[pos + 1] << 8)
+            pos += 2
+            if value == 0xFFFF:
+                for code in pending:
+                    table.setdefault(code, glyph)
+                pending = []
+                glyph += 1
+            elif value != 0xFFFE:
+                pending.append(value)
+    return glyphs, table, height
+
+
 def render_font():
     """Un carattere fisso da 8x8: una cella per lettera, come vuole il VDP.
 
     Le lettere sono bianche su fondo nero pieno, non trasparente: le celle di
     un piano ne contengono una sola, quindi una scritta sopra una fascia scura
     ne prenderebbe il posto e si leggerebbe il cielo attraverso le lettere."""
-    face = ImageFont.truetype(
-        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 9)
+    glyphs, table, height = load_psf(PSF_FONT)
     img = Image.new("RGBA", (8 * len(FONT_CHARS), 8), (0, 0, 0, 255))
+    px = img.load()
     for i, ch in enumerate(FONT_CHARS):
-        mask = Image.new("L", (8, 8), 0)
-        ImageDraw.Draw(mask).text((0, -1), ch, fill=255, font=face)
-        mask = mask.point(lambda v: 255 if v > 100 else 0)
-        cell = Image.new("RGBA", (8, 8), (0, 0, 0, 255))
-        cell.paste(Image.new("RGBA", (8, 8), (255, 255, 255, 255)), (0, 0), mask)
-        img.paste(cell, (i * 8, 0))
+        glyph = glyphs[table.get(ord(ch), table.get(32, 0))]
+        for y in range(min(8, height)):
+            row = glyph[y]
+            for x in range(8):
+                if row & (0x80 >> x):
+                    px[i * 8 + x, y] = (255, 255, 255, 255)
     return img
 
 

@@ -33,7 +33,7 @@ Serve un compilatore incrociato per 68000 e Python con Pillow (solo per
 rigenerare grafica e livelli):
 
 ```bash
-sudo apt install gcc-m68k-linux-gnu binutils-m68k-linux-gnu python3-pil
+sudo apt install gcc-m68k-linux-gnu binutils-m68k-linux-gnu python3-pil kbd
 make            # produce martello.bin
 make assets     # rigenera res/gfx.* dai PNG in tools/png
 make run        # avvia la ROM in BlastEm
@@ -94,7 +94,13 @@ pixel al secondo e un passo di 1/120 di secondo. Qui:
   immagine basta, perché il VDP sa ribaltarla e la giuntura sparisce;
 - **il pannello in cima** è il riquadro fisso del VDP, così non scorre; i
   cartelli brevi (cava ripulita, pausa) si scrivono invece dentro il piano di
-  gioco, per non coprire la scena.
+  gioco, per non coprire la scena;
+- **le scritte** usano il carattere a punti da 8x8 delle console di testo (il
+  classico disegno VGA, che `tools/md_assets.py` legge da
+  `/usr/share/consolefonts/Lat15-VGA8.psf.gz`, pacchetto `kbd`). Schiacciare un
+  TrueType in otto pixel dava lettere impastate: a quella misura serve un
+  carattere disegnato punto per punto. Le vocali accentate viaggiano come
+  codici bassi (`\1` = à, `\2` = è ... `\6` = ù), perché in ASCII non ci sono.
 
 Il piano di gioco del VDP è alto 256 pixel e le cave arrivano a 768: le righe
 di celle si ridipingono man mano che la vista sale, due per volta, dentro il

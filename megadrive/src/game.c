@@ -396,14 +396,14 @@ static void draw_title(void)
     /* il logo occupa 32 celle in larghezza: centrato, due righe più sotto */
     for (r = 0; r < 8; r++) {
         u16 line[32];
-        for (c = 0; c < 32; c++) line[c] = TILE_ATTR(logo_map[r * 32 + c], 3, 1, 0, 0);
+        for (c = 0; c < 32; c++) line[c] = TILE_ATTR(logo_map[r * 32 + c], 1, 1, 0, 0);
         vdp_map_row(VRAM_WINDOW, (u16)(3 + r), line, 32, 4);
     }
     panel(11, 11);
     text_center(VRAM_WINDOW, 12, "PREMI START PER COMINCIARE", 1);
     text_center(VRAM_WINDOW, 15, "croce direzionale: corri", 1);
     text_center(VRAM_WINDOW, 17, "B salta   A o C martella", 1);
-    text_center(VRAM_WINDOW, 19, "gi\002 + B per scendere dalle assi", 1);
+    text_center(VRAM_WINDOW, 19, "gi\006 + B per scendere dalle assi", 1);
     text_center(VRAM_WINDOW, 21, "START mette in pausa", 1);
 
     /* striscia di terreno in fondo: il nano ci sta sopra a martellare */
