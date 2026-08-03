@@ -45,6 +45,7 @@ void dwarf_reset(void)
     dwarf.swing = dwarf.swung = 0;
     dwarf.carrying = -1;
     dwarf.invuln = dwarf.hit_flash = 0;
+    dwarf.buffer_down = 0;
     dwarf.rider = -1;
 }
 
@@ -161,7 +162,7 @@ void dwarf_update(void)
 
     max_speed = (dwarf.carrying >= 0) ? DW_RUN_DRAG : DW_RUN;
     accel = dwarf.on_ground ? DW_ACC_GND : DW_ACC_AIR;
-    if (dwarf.swing) accel /= 5;            /* martellando ci si muove appena */
+    if (dwarf.swing) accel = (accel * 51) >> 8;   /* martellando ci si muove appena */
 
     if (dir) {
         dwarf.vx += dir * accel;
@@ -175,11 +176,21 @@ void dwarf_update(void)
     }
 
     /* salto, con un pizzico di memoria prima e dopo il bordo */
-    if (pad_pressed & PAD_B) dwarf.buffer = DW_BUFFER;
+    if (pad_pressed & PAD_B) {
+        dwarf.buffer = DW_BUFFER;
+        /* Si scende dalle assi solo se il giù era già premuto quando si è
+           schiacciato il salto, e senza destra o sinistra. Sulla croce
+           direzionale correndo si tocca il basso in diagonale un colpo sì e
+           uno no: senza questa condizione il salto si trasformava in una
+           discesa proprio mentre si correva. */
+        dwarf.buffer_down = (u8)((pad_state & PAD_DOWN) &&
+                                 !(pad_state & (PAD_LEFT | PAD_RIGHT)));
+    }
     if (dwarf.buffer) dwarf.buffer--;
     if (dwarf.coyote) dwarf.coyote--;
     if (dwarf.buffer && (dwarf.on_ground || dwarf.coyote)) {
-        if ((pad_state & PAD_DOWN) && dwarf.on_oneway) {
+        if (dwarf.buffer_down && (pad_state & PAD_DOWN) &&
+            !(pad_state & (PAD_LEFT | PAD_RIGHT)) && dwarf.on_oneway) {
             dwarf.drop_timer = 13;          /* 0,22 s per attraversare l'asse */
             dwarf.on_ground = 0;
             dwarf.rider = -1;
@@ -277,7 +288,7 @@ static void imp_move(Imp *im)
             if (!arena_solid(tx, ty)) continue;
             if (im->vx > 0) im->x = FIX(tx * CELL - r);
             else if (im->vx < 0) im->x = FIX((tx + 1) * CELL + r);
-            im->vx = -im->vx / 2;
+            im->vx = -(im->vx >> 1);
             hit = 1;
             break;
         }
@@ -307,7 +318,7 @@ static void imp_move(Imp *im)
             if (im->vy > 0) {
                 im->y = FIX(ty * CELL - r);
                 im->grounded = 1;
-                im->vy = stunned ? 0 : -(im->vy * 2 / 5);   /* rimbalzo smorzato */
+                im->vy = stunned ? 0 : -((im->vy * 51) >> 7);  /* rimbalzo smorzato */
             } else if (im->vy < 0 && solid) {
                 im->y = FIX((ty + 1) * CELL + r);
                 im->vy = 0;
@@ -317,7 +328,10 @@ static void imp_move(Imp *im)
     }
 }
 
-void imp_update(Imp *im)
+/* 'think' dice se in questo quadro tocca a lui ragionare: la regia alterna
+   metà spiritelli per volta e raddoppia i passi, così la media non cambia ma
+   il conto per quadro si dimezza. Il movimento invece è sempre fluido. */
+void imp_update(Imp *im, u8 think)
 {
     fix dcx = dwarf.x + FIX(DW_W / 2);
     fix dcy = dwarf.y + FIX(DW_H / 2);
@@ -355,13 +369,22 @@ void imp_update(Imp *im)
         return;
     }
 
+    if (!think) {                         /* quadro leggero: prosegue e basta */
+        im->x += im->vx;
+        im->y += im->vy;
+        return;
+    }
+
     /* ognuno presidia la sua zona e si occupa del nano solo se passa vicino */
-    im->bob += 452;                       /* 2,6 radianti al secondo */
+    im->bob += 904;                       /* 2,6 radianti al secondo, a passi doppi */
     flee = (im->flee != 0);
-    near = (vec_len(dcx - im->x, dcy - im->y) < FIX(IMP_AWARE));
-    if (im->dive) im->dive--;
+    {   /* distanza al quadrato: la radice qui non serve e costa cara */
+        s16 ddx = TOI(dcx - im->x), ddy = TOI(dcy - im->y);
+        near = (((s32)ddx * ddx + (s32)ddy * ddy) < (s32)IMP_AWARE * IMP_AWARE);
+    }
+    if (im->dive) im->dive = (u8)(im->dive > 1 ? im->dive - 2 : 0);
     else if (near && !flee) {
-        if (im->dive_in) im->dive_in--;
+        if (im->dive_in) im->dive_in = (u16)(im->dive_in > 1 ? im->dive_in - 2 : 0);
         if (im->dive_in == 0) {
             im->dive = IMP_DIVE;
             im->dive_in = (u16)(150 + (rnd() % 210));
@@ -385,12 +408,12 @@ void imp_update(Imp *im)
     }
 
     k = flee ? -1 : 1;
-    im->vx += SCALE(tx - im->x, diving ? 21 : 11) * k;
-    im->vy += SCALE(ty - im->y, diving ? 26 : 15) * k;
+    im->vx += SCALE(tx - im->x, diving ? 42 : 22) * k;
+    im->vy += SCALE(ty - im->y, diving ? 52 : 30) * k;
 
     sp = vec_len(im->vx, im->vy);
     max = (fix)arena->speed;
-    max = flee ? (max * 12 / 5) : (diving ? (max * 13 / 5) : (max * 3 / 2));
+    max = flee ? ((max * 77) >> 5) : (diving ? ((max * 83) >> 5) : (max + (max >> 1)));
     if (sp > max && (sp >> 8) > 0) {
         fix ratio = max / (sp >> 8);            /* 0..256 */
         im->vx = (im->vx * ratio) >> 8;

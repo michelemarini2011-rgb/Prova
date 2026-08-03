@@ -126,10 +126,13 @@ void vdp_scroll(s16 ax, s16 ay, s16 bx, s16 by)
     VDP_DATA_W = (u16)by;
 }
 
+/* Si aspetta il ritorno di quadro guardando il bit di stato del VDP, non il
+   contatore delle interruzioni: se per un motivo qualunque l'interruzione
+   scatta due volte, contarla farebbe perdere un quadro intero ogni giro. */
 void vdp_wait_vblank(void)
 {
-    u16 start = vblank_count;
-    while (vblank_count == start) { /* attesa */ }
+    while (VDP_CTRL_W & 0x0008) { }      /* esce da quello in corso */
+    while (!(VDP_CTRL_W & 0x0008)) { }   /* e aspetta il prossimo */
 }
 
 void vblank_isr(void)
@@ -143,21 +146,6 @@ void vblank_isr(void)
 void sprite_reset(void)
 {
     sprite_count = 0;
-}
-
-void sprite_add(s16 x, s16 y, u8 w_cells, u8 h_cells, u16 attr)
-{
-    Sprite *s;
-    if (sprite_count >= SPRITE_MAX) return;
-    /* fuori schermo: non vale la pena occupare una voce */
-    if (x <= -32 || x >= SCREEN_W || y <= -32 || y >= SCREEN_H) return;
-    s = &sprites[sprite_count];
-    s->y = (u16)(y + 128);
-    s->size = (u8)(((w_cells - 1) << 2) | (h_cells - 1));
-    s->link = (u8)(sprite_count + 1);
-    s->attr = attr;
-    s->x = (u16)(x + 128);
-    sprite_count++;
 }
 
 void sprite_flush(void)

@@ -72,8 +72,25 @@ extern Sprite sprites[SPRITE_MAX];
 extern u16    sprite_count;
 
 void sprite_reset(void);
-void sprite_add(s16 x, s16 y, u8 w_cells, u8 h_cells, u16 attr);
 void sprite_flush(void);
+
+/* Aggiunge uno sprite alla lista del quadro. Sta in linea perché la regia la
+   chiama una cinquantina di volte per quadro e il solo passaggio dei cinque
+   argomenti sulla pila costerebbe più del lavoro che fa. */
+static inline void sprite_add(s16 x, s16 y, u8 w_cells, u8 h_cells, u16 attr)
+{
+    Sprite *s;
+    if (sprite_count >= SPRITE_MAX) return;
+    /* fuori schermo: non vale la pena occupare una voce */
+    if (x <= -32 || x >= SCREEN_W || y <= -32 || y >= SCREEN_H) return;
+    s = &sprites[sprite_count];
+    s->y = (u16)(y + 128);
+    s->size = (u8)(((w_cells - 1) << 2) | (h_cells - 1));
+    s->link = (u8)(sprite_count + 1);
+    s->attr = attr;
+    s->x = (u16)(x + 128);
+    sprite_count++;
+}
 
 /* --------------------------------------------------------------- joypad */
 #define PAD_UP     0x01

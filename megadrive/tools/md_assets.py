@@ -31,10 +31,15 @@ LEVELS = [i * 255 // 7 for i in range(8)]
 # colori le tocca contendere: senza, un'icona di 16 pixel non avrebbe voce in
 # capitolo contro un foglio di disegni e finirebbe del colore sbagliato.
 GROUPS = {
-    0: [("tiles", 6), ("movplat", 2), ("crate", 1)],     # terra, erba, assi
-    1: [("dwarf", 5), ("icons", 3), ("font", 1)],        # nano e pannello
+    # Il terreno riempie mezzo schermo e i suoi ciottoli sono sfumature molto
+    # vicine: se gli restano pochi bruni diventano puntini di un altro colore e
+    # la terra sembra sporca. Stesso discorso per il cielo, che è una sfumatura
+    # lunga: con pochi azzurri si vede a fasce. Il logo, che di suo è oro su
+    # bruno scuro, sta bene nella tavolozza del nano.
+    0: [("tiles", 9), ("movplat", 2), ("crate", 1)],     # terra, erba, assi
+    1: [("dwarf", 5), ("icons", 2), ("font", 1), ("logo", 2)],
     2: [("imps", 4), ("portal", 2), ("hazard", 2)],      # spiritelli e punte
-    3: [("backdrop", 3), ("logo", 2), ("machine", 3)],   # cielo e macchinario
+    3: [("backdrop", 7), ("machine", 3)],                # cielo e macchinario
 }
 SAMPLES = 12000          # campioni per unità di peso, per il median cut
 
@@ -47,11 +52,11 @@ def load(name):
     return Image.open(os.path.join(PNG, name + ".png")).convert("RGBA")
 
 
-def half(img, size=None):
+def half(img, size=None, filt=Image.LANCZOS):
     """Riduce a metà (o alla misura data) tenendo pulito il canale alfa."""
     if size is None:
         size = (img.width // 2, img.height // 2)
-    out = img.resize(size, Image.LANCZOS)
+    out = img.resize(size, filt)
     r, g, b, a = out.split()
     a = a.point(lambda v: 255 if v >= 128 else 0)
     return Image.merge("RGBA", (r, g, b, a))
@@ -62,6 +67,26 @@ def posterize(img):
     lut = bytes(LEVELS[min(7, (v * 8) // 256)] for v in range(256))
     r, g, b, a = img.split()
     return Image.merge("RGBA", (r.point(lut), g.point(lut), b.point(lut), a))
+
+
+# Scala di bruni per l'asse mobile: nell'originale è d'acciaio azzurrino, ma
+# fra i quindici colori del mondo (verdi ed marroni) il grigio non ci sta e
+# verrebbe fuori rosa. Rifatta di legno sta insieme alle assi fisse.
+WOOD = [(72, 36, 0), (109, 72, 36), (145, 72, 36), (182, 109, 72),
+        (218, 145, 72), (255, 182, 109), (255, 218, 145), (255, 236, 200)]
+
+
+def wooden(img):
+    out = img.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if a < 128:
+                continue
+            lum = (r * 77 + g * 151 + b * 28) >> 8
+            px[x, y] = WOOD[min(7, lum * 8 // 256)] + (255,)
+    return out
 
 
 def render_font():
@@ -204,12 +229,16 @@ def main():
             if n == "font":
                 raw[n] = render_font()
             elif n == "backdrop":
-                # metà piano: l'altra metà è la stessa, ribaltata dal VDP
-                raw[n] = half(load(n), (256, 256))
+                # Metà piano: l'altra metà è la stessa, ribaltata dal VDP.
+                # Media d'area invece di Lanczos: quest'ultimo, sul bordo fra
+                # nuvola e cielo, inventa un alone che diventa una frangia.
+                raw[n] = half(load(n), (256, 256), Image.BOX)
             elif n == "logo":
                 raw[n] = half(load(n), (256, 64))
             elif n == "hazard":
                 raw[n] = half(load(n), (24, 24))
+            elif n == "movplat":
+                raw[n] = wooden(half(load(n)))
             elif n == "icons":
                 # le icone stanno nel pannello: fondo nero pieno, o si vedrebbe
                 # il cielo del piano di sfondo attraverso le parti trasparenti
@@ -265,8 +294,10 @@ def main():
 
     # ---- una cella piena (fasce dei cartelli) e le particelle
     solid = bank.add(bytes([0x11] * 32))          # colore 1 della tavolozza 1
-    dust = bank.add(disc(nearest(0, (222, 182, 128)), 2.2))
-    spark = bank.add(disc(nearest(1, (255, 226, 90)), 1.8))
+    dust = bank.add(disc(nearest(0, (222, 182, 128)), 1.9))
+    bank.add(disc(nearest(0, (222, 182, 128)), 0.9))    # polvere che si spegne
+    spark = bank.add(disc(nearest(1, (255, 226, 90)), 1.6))
+    bank.add(disc(nearest(1, (255, 226, 90)), 0.8))     # scintilla che si spegne
 
     # ---- carattere: una cella per lettera
     idx, w, h = indexed["font"]

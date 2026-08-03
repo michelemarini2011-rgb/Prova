@@ -16,8 +16,12 @@ cartuccia dichiara le tre regioni, quindi non serve impostare niente.
 | Croce direzionale | corri |
 | B | salta |
 | A o C | martella |
-| ↓ + B | scendi dalle assi |
+| ↓ + B (fermo) | scendi dalle assi |
 | START | pausa (e, in pausa, A ricomincia la cava) |
+
+Per scendere da un'asse bisogna essere fermi: tenendo il basso mentre si corre
+la croce direzionale prende spesso la diagonale, e il salto diventerebbe una
+caduta senza volerlo.
 
 Obiettivo: stordire gli spiritelli a martellate, trascinarli fino al
 macchinario e inscatolarli tutti; poi si attraversa il portale che si apre.
@@ -80,9 +84,12 @@ pixel al secondo e un passo di 1/120 di secondo. Qui:
   una tabella di seni a 256 passi e una lunghezza di vettore approssimata a un
   sedicesimo di pixel;
 - **la grafica** è quella originale, dimezzata e ridotta ai colori del VDP
-  (quattro tavolozze da quindici colori, tre bit per componente). Le immagini
-  piccole hanno un peso nel calcolo delle tavolozze, altrimenti un cuore di
-  sedici pixel finirebbe viola;
+  (quattro tavolozze da quindici colori, tre bit per componente). Ogni immagine
+  ha un peso nel calcolo delle tavolozze: senza, un cuore di sedici pixel non
+  avrebbe voce contro un foglio di disegni e finirebbe viola, e il cielo — che
+  è una sfumatura lunga — si vedrebbe a fasce. L'asse mobile, che
+  nell'originale è d'acciaio azzurrino, è rifatta di legno: fra i verdi e i
+  bruni del mondo il grigio non ci stava e usciva rosa;
 - **il fondale** occupa il piano B e scorre più piano della cava; metà
   immagine basta, perché il VDP sa ribaltarla e la giuntura sparisce;
 - **il pannello in cima** è il riquadro fisso del VDP, così non scorre; i
@@ -92,6 +99,37 @@ pixel al secondo e un passo di 1/120 di secondo. Qui:
 Il piano di gioco del VDP è alto 256 pixel e le cave arrivano a 768: le righe
 di celle si ridipingono man mano che la vista sale, due per volta, dentro il
 ritorno di quadro.
+
+### Stare dentro il quadro
+
+Sessanta quadri al secondo vogliono dire 127.800 cicli a testa, e non uno di
+più: se il conto sfora, il gioco aspetta il quadro dopo e va a trenta. La
+prima versione sforava con quattro spiritelli. Le misure (contatore verticale
+del VDP letto a ogni fase, così si vede dove va il tempo) hanno indicato:
+
+- **le divisioni**. Il compilatore, per dividere due interi lunghi, chiamava
+  una routine a forza bruta da milleduecento cicli, e ce n'erano una ventina
+  per quadro. Il 68000 ha la DIVU (32 bit per 16, un centinaio di cicli): due
+  passaggi coprono qualunque divisore normale. Vedi `src/mathi.s`;
+- **la lettura della mappa**. Ogni corpo che si muove interroga le celle
+  attorno a sé, e ogni interrogazione era una chiamata di funzione con
+  moltiplicazione. Ora c'è un puntatore per riga e le funzioni stanno in linea
+  (`arena_cell` in `src/game.h`);
+- **gli spiritelli**. Ragionano a turno, metà per quadro, con passi doppi: la
+  media non cambia e il conto si dimezza. Il movimento resta a sessanta;
+- **`-O2` invece di `-Os`**: da solo ha tolto un quarto del tempo.
+
+Alla fine la cava più affollata (sette spiritelli, quattro blocchi, cinque
+assi) sta in circa 190 righe di schermo su 262.
+
+### Aspettare il quadro
+
+L'attesa del ritorno di quadro guarda il bit di stato del VDP, non il
+contatore delle interruzioni: quest'ultimo, se per un motivo qualunque
+l'interruzione scatta due volte, farebbe saltare un quadro intero a ogni giro.
+La telecamera, poi, insegue il nano in virgola fissa e arrotonda solo al
+momento di scrivere il registro di scorrimento: tenendo la posizione in pixel
+interi l'inseguimento avanzava a scatti e lo scorrimento singhiozzava.
 
 ### Tre trappole del 68000
 

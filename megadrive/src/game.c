@@ -12,6 +12,7 @@ Game game;
 static Particle particles[MAX_PARTICLES];
 static u8 particle_count;
 
+
 static u16 hud_seconds;         /* per ridisegnare il pannello solo se serve */
 static u8  hud_dirty;
 static u8  window_full;         /* il riquadro copre tutto lo schermo? */
@@ -31,7 +32,7 @@ void particles_burst(fix x, fix y, u8 kind, u8 n, fix speed)
     for (i = 0; i < n && particle_count < MAX_PARTICLES; i++) {
         Particle *q = &particles[particle_count++];
         u8 a = (u8)rnd();
-        fix v = speed / 2 + ((speed * (rnd() & 63)) >> 7);
+        fix v = (speed >> 1) + ((speed * (rnd() & 63)) >> 7);
         q->x = x;
         q->y = y;
         q->vx = (cos_t(a) * v) >> 8;
@@ -52,7 +53,7 @@ void particles_ring(fix x, fix y, u8 n)
         q->x = x;
         q->y = y;
         q->vx = (cos_t(a) * v) >> 8;
-        q->vy = ((sin_t(a) * v) >> 8) * 3 / 5;
+        q->vy = (((sin_t(a) * v) >> 8) * 77) >> 7;
         q->life = q->max_life = 27;
         q->kind = 0;
     }
@@ -83,6 +84,7 @@ void particles_draw(void)
         s16 sx = TOI(q->x) - game.cam_x - 4;
         s16 sy = TOI(q->y) - game.cam_y + HUD_H - 4;
         u16 tile = q->kind ? TILE_SPARK : TILE_DUST;
+        if (q->life * 3 < q->max_life) tile++;    /* verso la fine, più piccola */
         sprite_add(sx, sy, 1, 1, TILE_ATTR(tile, q->kind ? 1 : 0, 0, 0, 0));
     }
 }
@@ -277,12 +279,16 @@ static void update_camera(u8 snap)
     if (ty > max_y) ty = max_y;
 
     if (snap) {
-        game.cam_x = tx;
-        game.cam_y = ty;
+        game.cam_fx = FIX(tx);
+        game.cam_fy = FIX(ty);
     } else {
-        game.cam_x += ((s32)(tx - game.cam_x) * 23) >> 8;
-        game.cam_y += ((s32)(ty - game.cam_y) * 23) >> 8;
+        /* l'inseguimento tiene i decimali: arrotondando a ogni quadro la
+           vista avanzerebbe a scatti di un pixel invece che di frazioni */
+        game.cam_fx += SCALE(FIX(tx) - game.cam_fx, 23);
+        game.cam_fy += SCALE(FIX(ty) - game.cam_fy, 23);
     }
+    game.cam_x = TOI(game.cam_fx);
+    game.cam_y = TOI(game.cam_fy);
 }
 
 static void update_play(void)
@@ -293,7 +299,8 @@ static void update_play(void)
     dwarf_update();
     for (i = 0; i < block_count; i++) block_update(&blocks[i]);
     for (i = 0; i < imp_count; i++)
-        if (imps[i].state != IMP_BOXED) imp_update(&imps[i]);
+        if (imps[i].state != IMP_BOXED)
+            imp_update(&imps[i], (u8)(((i + game.time) & 1) == 0));
 
     check_carry();
     check_spikes();
@@ -334,13 +341,11 @@ static void draw_hud(void)
     const char *name = arena ? arena->name : "";
     u16 n;
 
-    /* fondo del pannello */
     for (i = 0; i < 40; i++) row[i] = SOLID_TILE;
     vdp_map_row(VRAM_WINDOW, 0, row, 40, 0);
     vdp_map_row(VRAM_WINDOW, 1, row, 40, 0);
-    vdp_map_row(VRAM_WINDOW, 2, row, 40, 0);
 
-    /* cuori: pieni finché ce ne sono, poi vuoti */
+    /* cuori e scatole: le icone sono alte due celle e coprono tutta la barra */
     for (i = 0; i < HEARTS; i++) {
         const u16 *cell = &icon_cells[(i < game.hearts ? 0 : 1) * 4];
         u16 top[2], bot[2];
@@ -351,8 +356,6 @@ static void draw_hud(void)
         vdp_map_row(VRAM_WINDOW, 0, top, 2, (u16)(1 + i * 2));
         vdp_map_row(VRAM_WINDOW, 1, bot, 2, (u16)(1 + i * 2));
     }
-
-    /* scatole consegnate */
     {
         const u16 *cell = &icon_cells[2 * 4];
         u16 top[2], bot[2];
@@ -363,21 +366,18 @@ static void draw_hud(void)
         vdp_map_row(VRAM_WINDOW, 0, top, 2, 9);
         vdp_map_row(VRAM_WINDOW, 1, bot, 2, 9);
     }
+
     text_number(VRAM_WINDOW, 12, 0, game.boxed, 1, 1);
     text_put(VRAM_WINDOW, 13, 0, "/", 1);
     text_number(VRAM_WINDOW, 14, 0, game.total, 1, 1);
-
-    /* tempo e martellate sotto le icone, cava e nome sulla destra */
     text_number(VRAM_WINDOW, 12, 1, hud_seconds, 3, 1);
     text_put(VRAM_WINDOW, 16, 1, "s", 1);
-    text_put(VRAM_WINDOW, 1, 2, "martellate", 1);
-    text_number(VRAM_WINDOW, 12, 2, game.hammers, 3, 1);
 
     text_put(VRAM_WINDOW, 33, 0, "cava", 1);
     text_number(VRAM_WINDOW, 38, 0, (u16)(game.index + 1), 1, 1);
     n = text_len(name);
-    if (n > 26) n = 26;
-    text_put(VRAM_WINDOW, (u16)(39 - n), 2, name, 1);
+    if (n > 20) n = 20;
+    text_put(VRAM_WINDOW, (u16)(39 - n), 1, name, 1);
 }
 
 /* Una fascia piena dietro al testo, per staccarlo dal cielo. */
@@ -779,7 +779,6 @@ void game_init(void)
 
 void game_frame(void)
 {
-
     s16 bx, by, ax, ay;
 
     pad_read();

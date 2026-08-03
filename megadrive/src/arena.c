@@ -5,6 +5,7 @@
 #include "gfx.h"
 
 const ArenaDef *arena;
+const u8 *arena_row[MAX_ARENA_ROWS];
 u16 arena_rows, arena_h;
 fix start_x, start_y;
 fix portal_x, portal_y;
@@ -14,24 +15,6 @@ u8  machine_crates;
 u8  has_machine;
 
 static s16 painted_lo, painted_hi;      /* righe di celle già dipinte */
-
-u8 arena_cell(s16 cx, s16 cy)
-{
-    if (cx < 0 || cx >= COLS) return CELL_SOLID;      /* i fianchi chiudono */
-    if (cy < 0 || cy >= (s16)arena_rows) return CELL_EMPTY;
-    return arena->map[cy * COLS + cx];
-}
-
-u8 arena_solid(s16 cx, s16 cy)
-{
-    u8 c = arena_cell(cx, cy);
-    return (c == CELL_SOLID || c == CELL_MACHINE);
-}
-
-u8 arena_oneway(s16 cx, s16 cy)
-{
-    return arena_cell(cx, cy) == CELL_ONEWAY;
-}
 
 /* Le celle coperte dal macchinario restano solide ma le disegna lui. */
 u8 arena_under_machine(s16 cx, s16 cy)
@@ -132,6 +115,8 @@ void arena_load(u8 index)
     arena = &arenas[index];
     arena_rows = arena->rows;
     arena_h = (u16)(arena_rows * CELL);
+    for (cy = 0; cy < (s16)arena_rows && cy < MAX_ARENA_ROWS; cy++)
+        arena_row[cy] = arena->map + cy * COLS;
 
     imp_count = 0;
     block_count = 0;

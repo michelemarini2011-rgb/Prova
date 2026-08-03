@@ -35,13 +35,13 @@ typedef s32 fix;                        /* 65536 = un pixel */
 #define COLS      ARENA_COLS
 #define WORLD_W   (COLS * CELL)
 
-#define HUD_H     24                    /* righe fisse in cima allo schermo */
+#define HUD_H     16                    /* righe fisse in cima allo schermo */
 #define VIEW_H    (SCREEN_H - HUD_H)    /* finestra di gioco: 320x200 */
 
 #define MAX_IMPS      8
 #define MAX_BLOCKS    6
 #define MAX_PLATS     6
-#define MAX_PARTICLES 20
+#define MAX_PARTICLES 14
 #define HEARTS        3
 
 /* ------------------------------------------------------------------ nano */
@@ -71,6 +71,7 @@ typedef struct {
     s8  facing;
     u8  on_ground, on_oneway;
     u8  coyote, buffer, jumping;
+    u8  buffer_down;                    /* si teneva giù quando ha premuto? */
     u8  drop_timer;
     u16 anim;
     u8  swing, swung;
@@ -152,7 +153,8 @@ typedef struct {
     u8  portal_open;
     u8  paused;
     u16 time;           /* quadri dall'avvio, per le animazioni */
-    s16 cam_x, cam_y;
+    s16 cam_x, cam_y;   /* posizione in pixel interi, per il VDP */
+    fix cam_fx, cam_fy; /* la stessa, con i decimali: l'inseguimento è morbido */
     const char *death_msg;
 } Game;
 
@@ -173,19 +175,42 @@ extern s16 intake_x, intake_y;
 extern u8  machine_crates;
 extern u8  has_machine;
 
+#define MAX_ARENA_ROWS 64
+extern const u8 *arena_row[MAX_ARENA_ROWS];   /* una riga della mappa per voce */
+
 void arena_load(u8 index);
-u8   arena_cell(s16 cx, s16 cy);
-u8   arena_solid(s16 cx, s16 cy);
-u8   arena_oneway(s16 cx, s16 cy);
 u8   arena_under_machine(s16 cx, s16 cy);
 void arena_paint(s16 cam_y, u8 all);
+
+/* La mappa si legge tantissime volte per quadro (ogni corpo che si muove
+   controlla le celle attorno a sé): niente chiamate di funzione e nessuna
+   moltiplicazione, solo un puntatore per riga. Il trucco del cast a senza
+   segno prende in un colpo solo sia i valori negativi sia quelli oltre il
+   bordo. */
+static inline u8 arena_cell(s16 cx, s16 cy)
+{
+    if ((u16)cx >= (u16)COLS) return CELL_SOLID;      /* i fianchi chiudono */
+    if ((u16)cy >= arena_rows) return CELL_EMPTY;
+    return arena_row[cy][cx];
+}
+
+static inline u8 arena_solid(s16 cx, s16 cy)
+{
+    u8 c = arena_cell(cx, cy);
+    return (u8)(c == CELL_SOLID || c == CELL_MACHINE);
+}
+
+static inline u8 arena_oneway(s16 cx, s16 cy)
+{
+    return (u8)(arena_cell(cx, cy) == CELL_ONEWAY);
+}
 
 /* -------------------------------------------------------------- entità */
 void dwarf_reset(void);
 void dwarf_update(void);
 void dwarf_hurt(fix from_x);
 void imp_reset(Imp *im);
-void imp_update(Imp *im);
+void imp_update(Imp *im, u8 think);
 void imp_shock(Imp *im, fix fx, fix fy, fix power, u16 stun);
 void imp_break_free(Imp *im);
 void block_update(Block *b);
@@ -201,9 +226,24 @@ void particles_draw(void);
 /* --------------------------------------------------------------- varie */
 u16  rnd(void);
 u16  isqrt32(u32 v);
-s16  sin_t(u8 angle);                   /* -256..256 */
-s16  cos_t(u8 angle);
 fix  vec_len(fix dx, fix dy);
+
+/* Seno e coseno da tabella, ampiezza 256: stanno in linea perché li chiamano
+   tutti gli spiritelli a ogni quadro e una chiamata costerebbe più del conto. */
+extern const s16 sin_quarter[65];
+
+static inline s16 sin_t(u8 angle)
+{
+    u8 i = (u8)(angle & 63);
+    switch ((u8)(angle >> 6)) {
+    case 0:  return sin_quarter[i];
+    case 1:  return sin_quarter[64 - i];
+    case 2:  return (s16)(-sin_quarter[i]);
+    default: return (s16)(-sin_quarter[64 - i]);
+    }
+}
+
+static inline s16 cos_t(u8 angle) { return sin_t((u8)(angle + 64)); }
 
 /* --------------------------------------------------------------- testo */
 void text_clear(u16 plane, u16 tile);

@@ -16,7 +16,7 @@ ELF     := build/martello.elf
 # -fno-store-merging: senza, il compilatore accorpa due scritture di un byte
 # in una sola da 16 bit anche a indirizzo dispari. Il 68020 lo tollera, il
 # 68000 del Mega Drive risponde con un errore di indirizzo.
-CFLAGS  := -m68000 -Os -std=gnu99 -Wall -Wextra -Wno-unused-parameter \
+CFLAGS  := -m68000 -O2 -std=gnu99 -Wall -Wextra -Wno-unused-parameter \
            -ffreestanding -fno-builtin -fomit-frame-pointer -fno-pic \
            -fno-common -fno-strict-aliasing -fno-store-merging -Isrc -Ires \
            -MMD -MP $(CFLAGS_EXTRA)

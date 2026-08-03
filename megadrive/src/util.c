@@ -27,29 +27,13 @@ u16 isqrt32(u32 v)
 }
 
 /* Un quarto di sinusoide: 64 passi da 0 a 90 gradi, ampiezza 256. */
-static const s16 sin_quarter[65] = {
+const s16 sin_quarter[65] = {
       0,   6,  13,  19,  25,  31,  38,  44,  50,  56,  62,  68,  74,  80,  86,
      92,  98, 104, 109, 115, 121, 126, 132, 137, 142, 147, 152, 157, 162, 167,
     172, 177, 181, 185, 190, 194, 198, 202, 206, 209, 213, 216, 220, 223, 226,
     229, 231, 234, 237, 239, 241, 243, 245, 247, 248, 250, 251, 252, 253, 254,
     255, 255, 256, 256, 256
 };
-
-s16 sin_t(u8 angle)
-{
-    u8 quad = (u8)(angle >> 6), i = (u8)(angle & 63);
-    switch (quad) {
-    case 0: return sin_quarter[i];
-    case 1: return sin_quarter[64 - i];
-    case 2: return (s16)(-sin_quarter[i]);
-    default: return (s16)(-sin_quarter[64 - i]);
-    }
-}
-
-s16 cos_t(u8 angle)
-{
-    return sin_t((u8)(angle + 64));
-}
 
 /* Lunghezza di un vettore in virgola fissa, con un sedicesimo di pixel di
    precisione: basta e non fa traboccare i 32 bit. */

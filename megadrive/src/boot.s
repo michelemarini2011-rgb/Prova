@@ -124,7 +124,8 @@ _hang:
     .globl  _int_vblank
 _int_vblank:
     movem.l %d0-%d1/%a0-%a1, -(%sp)
-    jsr     vblank_isr
+    move.w  0x00C00004, %d0             | leggere lo stato spegne la richiesta
+    jsr     vblank_isr                  | del VDP: senza, rientra subito qui
     movem.l (%sp)+, %d0-%d1/%a0-%a1
     rte
 

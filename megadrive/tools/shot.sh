@@ -64,6 +64,7 @@ for k in "$@"; do
     *)
         # più tasti insieme si scrivono "Right+s:60"
         IFS='+' read -ra KEYS <<< "$key"
+        [ -n "$WIN" ] && xdotool windowactivate --sync "$WIN" 2>/dev/null
         for kk in "${KEYS[@]}"; do xdotool keydown "$kk"; done
         sleep "$dur"
         for kk in "${KEYS[@]}"; do xdotool keyup "$kk"; done
