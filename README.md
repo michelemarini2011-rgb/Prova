@@ -79,3 +79,10 @@ supersampling 4× per l'antialiasing:
 Modificando `tools/maze_layout.txt` cambiano sia l'immagine del labirinto sia la
 logica di gioco: lo script rigenera anche `js/maze-layout.js`, unica fonte di verità
 condivisa fra grafica e collisioni.
+
+## Altro nel repository
+
+`megadrive/` contiene una cosa diversa: la conversione del gioco *Martello &
+Scatole* in una cartuccia per Sega Mega Drive (`megadrive/martello.bin`, da
+aprire con un emulatore). I dettagli sono nel suo
+[README](megadrive/README.md).
