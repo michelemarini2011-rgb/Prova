@@ -45,9 +45,10 @@ GROUPS = {
 SAMPLES = 12000          # campioni per unità di peso, per il median cut
 
 # Immagini che entrano in una tavolozza ma non partecipano a sceglierne i
-# colori: il logo inglese è fatto con gli stessi due colori di quello italiano,
-# quindi non ha niente da chiedere e così le tavolozze restano identiche.
-GUESTS = {1: ["logo_en"]}
+# colori: il logo inglese è fatto con gli stessi due colori di quello italiano
+# e il fondale senza sole è il fondale, quindi non hanno niente da chiedere e
+# così le tavolozze restano identiche.
+GUESTS = {1: ["logo_en"], 3: ["backdrop_nosun"]}
 
 FONT_CHARS = ([chr(c) for c in range(32, 127)] +
               ["à", "è", "é", "ì", "ò", "ù"])
@@ -80,6 +81,38 @@ def posterize(img):
 # verrebbe fuori rosa. Rifatta di legno sta insieme alle assi fisse.
 WOOD = [(72, 36, 0), (109, 72, 36), (145, 72, 36), (182, 109, 72),
         (218, 145, 72), (255, 182, 109), (255, 218, 145), (255, 236, 200)]
+
+
+# Il fondale occupa mezzo piano e il VDP ribalta quella metà per riempire
+# l'altra: le nuvole non se ne accorgono, ma il sole sì, e in cielo ne
+# comparivano due. Qui se ne fa una copia senza, che va nella metà ribaltata;
+# il sole resta uno solo, al suo posto.
+SUN = (217, 36, 32, 36)                 # centro e semiassi, nell'immagine da 256
+
+
+def strip_sun(img):
+    cx, cy, rx, ry = SUN
+    out = img.copy()
+    px = out.load()
+    for y in range(cy - ry, cy + ry + 1):
+        sky = px[1, y]                      # il cielo di quella riga, a sinistra
+        for x in range(cx - rx, cx + rx + 1):
+            dx = (x - cx) / rx
+            dy = (y - cy) / ry
+            if dx * dx + dy * dy > 1.0:
+                continue
+            r, g, b, a = px[x, y]
+            # dentro l'ellisse c'è solo il sole, il suo alone e il pezzo di
+            # nuvola che gli passa davanti. La nuvola è chiara in tutte e tre
+            # le componenti; il giallo del sole ha poco blu e l'alone poco
+            # rosso, quindi bastano due soglie per lasciare stare la nuvola.
+            if r >= 210 and b >= 210:
+                # la nuvola scaldata dal sole torna bianca
+                if r > b:
+                    px[x, y] = (r, g, r, a)
+            else:
+                px[x, y] = sky
+    return out
 
 
 def wooden(img):
@@ -274,6 +307,8 @@ def main():
             # Media d'area invece di Lanczos: quest'ultimo, sul bordo fra
             # nuvola e cielo, inventa un alone che diventa una frangia.
             raw[n] = half(load(n), (256, 256), Image.BOX)
+        elif n == "backdrop_nosun":
+            raw[n] = strip_sun(half(load("backdrop"), (256, 256), Image.BOX))
         elif n.startswith("logo"):
             raw[n] = half(load(n), (256, 64))
         elif n == "hazard":
@@ -418,14 +453,21 @@ def main():
 
     # ---- fondale e logo: mappe di celle con i disegni ripetuti riusati
     idx, w, h = indexed["backdrop"]
-    left_half = bank.block(idx, w, h, 0, 0, 32, 32, dedup=True)
+    sunny = bank.block(idx, w, h, 0, 0, 32, 32, dedup=True)
+    idx, w, h = indexed["backdrop_nosun"]
+    plain = bank.block(idx, w, h, 0, 0, 32, 32, dedup=True)
     # Il piano è largo 64 celle: la metà destra riusa gli stessi disegni
-    # ribaltati, così il cielo non ha giunte e non costa altra memoria.
+    # ribaltati, così il cielo non ha giunte e non costa altra memoria. Il sole
+    # però comparirebbe due volte, uno per lato: sta solo nella metà ribaltata
+    # (dove nella schermata del titolo spunta accanto al logo) e la metà di
+    # sinistra usa la copia senza. Le uniche celle nuove sono quelle del sole,
+    # tutte le altre le riconosce il dedup.
     backdrop_map = []
     for row in range(32):
-        line = left_half[row * 32:(row + 1) * 32]
+        line = plain[row * 32:(row + 1) * 32]
+        mirror = sunny[row * 32:(row + 1) * 32]
         backdrop_map.extend(line)
-        backdrop_map.extend(t | 0x0800 for t in reversed(line))
+        backdrop_map.extend(t | 0x0800 for t in reversed(mirror))
     # Le due lingue portano ognuna il suo logo: sono parole diverse, ma i
     # disegni uguali (il fondo, i pieni) se li spartiscono.
     idx, w, h = indexed["logo"]

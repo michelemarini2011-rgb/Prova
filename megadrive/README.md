@@ -105,7 +105,11 @@ pixel al secondo e un passo di 1/120 di secondo. Qui:
   nell'originale è d'acciaio azzurrino, è rifatta di legno: fra i verdi e i
   bruni del mondo il grigio non ci stava e usciva rosa;
 - **il fondale** occupa il piano B e scorre più piano della cava; metà
-  immagine basta, perché il VDP sa ribaltarla e la giuntura sparisce;
+  immagine basta, perché il VDP sa ribaltarla e la giuntura sparisce. Le nuvole
+  del ribaltamento non se ne accorgono, il sole sì: ne comparivano due, uno per
+  lato. Ora la metà non ribaltata usa una copia del cielo senza sole (`strip_sun`
+  in `tools/md_assets.py`, che cancella il disco e il suo alone lasciando stare
+  la nuvola che gli passa davanti), e il sole resta uno solo, dov'era;
 - **il pannello in cima** è il riquadro fisso del VDP, così non scorre; i
   cartelli brevi (cava ripulita, pausa) si scrivono invece dentro il piano di
   gioco, per non coprire la scena;
