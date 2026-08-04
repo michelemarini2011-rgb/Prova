@@ -29,6 +29,12 @@ Obiettivo: stordire gli spiritelli a martellate, trascinarli fino al
 macchinario e inscatolarli tutti; poi si attraversa il portale che si apre.
 Tre cuori, le punte dei blocchi irti uccidono al primo tocco.
 
+Due cose da guardare mentre si gioca: la **barra sopra la testa** dello
+spiritello stordito dice quanto manca prima che si svegli (se lo si sta
+trasportando, quanto manca prima che scappi), e la **freccia sul bordo dello
+schermo** punta verso il macchinario mentre si trasporta, verso il portale
+quando si è aperto.
+
 ## Costruire la ROM
 
 Serve un compilatore incrociato per 68000 e Python con Pillow (solo per
@@ -123,6 +129,31 @@ pixel al secondo e un passo di 1/120 di secondo. Qui:
 Il piano di gioco del VDP è alto 256 pixel e le cave arrivano a 768: le righe
 di celle si ridipingono man mano che la vista sale, due per volta, dentro il
 ritorno di quadro.
+
+### Quello che si vede senza leggerlo
+
+Tre indicazioni che l'originale dà con mezzi che qui non ci sono — un cerchio
+disegnato attorno allo spiritello, un pallino colorato, il canvas che si
+dissolve — e che sul VDP si fanno con quello che c'è:
+
+- **la barra del torpore** è larga due celle e ha nove disegni pronti, da vuoto
+  a pieno, uno per ogni ottavo: due celle affiancate danno sedici passi, e non
+  serve disegnare niente al volo;
+- **la freccia dei bersagli fuori vista** è un solo disegno da 16x16 che punta a
+  destra. Le altre tre direzioni sono lo stesso disegno ribaltato dal VDP, che
+  per gli sprite sa fare entrambi i ribaltamenti. Prima c'era un pallino, che
+  diceva dove ma non da che parte;
+- **il portale** si prende il nano con un vortice: parte da dov'era, gira
+  attorno al centro allargandosi e richiudendosi, e finisce dietro lo sprite
+  del portale — che sta prima nella lista, quindi gli passa davanti. Gli sprite
+  del Mega Drive non si possono rimpicciolire, ma un giro che si chiude
+  racconta la stessa cosa.
+
+Poi lo schermo si spegne e si riaccende sulla cava dopo. Il Mega Drive non ha
+una dissolvenza: si riscrivono le quattro tavolozze scurite, otto livelli, un
+passo ogni due quadri. Le componenti sono di tre bit, quindi la tabella dei
+valori scuriti sta in settantadue byte — e nel ritorno di quadro non c'è
+tempo per centonovantadue divisioni.
 
 ### Due lingue
 

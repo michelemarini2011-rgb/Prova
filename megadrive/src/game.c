@@ -17,13 +17,54 @@ static u8 particle_count;
 static u16 hud_seconds;         /* per ridisegnare il pannello solo se serve */
 static u8  hud_dirty;
 static u8  window_full;         /* il riquadro copre tutto lo schermo? */
+static s16 enter_x, enter_y;    /* dov'era il nano quando ha toccato il portale */
 
 #define GRAB_DIST PXI(34)
 #define SOLID_TILE TILE_ATTR(TILE_SOLID, 1, 1, 0, 0)
 
+/* Il portale: quanto dura la scena fra una cava e l'altra. */
+#define CLEAR_FRAMES  102               /* 1,7 s in tutto */
+#define SPIRAL_FRAMES 46                /* il nano che viene risucchiato */
+#define FADE_FRAMES   18                /* la coda: lo schermo si spegne */
+
 static void set_state(u8 state, u16 timer);
 static void draw_card(void);
 static void overlay_message(const char *line1, const char *line2);
+
+/* ------------------------------------------------------------- sfumatura */
+
+/* Le tavolozze si rimandano al VDP scurite: v * livello / 8, precalcolato,
+   perché ottantasei divisioni per quadro non ci starebbero nel ritorno di
+   quadro (e le componenti sono tre bit, quindi la tabella è minuscola). */
+static const u8 dim[9][8] = {
+    {0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 1, 1, 1, 1}, {0, 0, 0, 1, 1, 1, 2, 2},
+    {0, 0, 1, 1, 2, 2, 3, 3}, {0, 0, 1, 1, 2, 3, 3, 4},
+    {0, 0, 1, 2, 3, 3, 4, 5}, {0, 0, 1, 2, 3, 4, 5, 6},
+    {0, 1, 2, 3, 4, 5, 6, 7},
+};
+
+static u8 fade_now = 8, fade_want = 8;
+
+/* Un passo ogni due quadri: otto livelli fanno poco più di un quarto di
+   secondo, il tempo giusto perché il buio si veda ma non annoi. */
+static void fade_step(void)
+{
+    u16 pal[16];
+    u8 p, i;
+    if (fade_now == fade_want || (game.time & 1)) return;
+    fade_now = (u8)(fade_now < fade_want ? fade_now + 1 : fade_now - 1);
+    for (p = 0; p < 4; p++) {
+        const u8 *d = dim[fade_now];
+        for (i = 0; i < 16; i++) {
+            u16 c = gfx_palettes[p][i];
+            pal[i] = (u16)((d[(c >> 9) & 7] << 9) |
+                           (d[(c >> 5) & 7] << 5) |
+                           (d[(c >> 1) & 7] << 1));
+        }
+        vdp_load_palette((u8)(p * 16), pal, 16);
+    }
+}
 
 /* ---------------------------------------------------------- particelle */
 
@@ -321,8 +362,10 @@ static void update_play(void)
         if (dx < 0) dx = -dx;
         if (dy < 0) dy = -dy;
         if (dx < 15 && dy < 30) {
+            enter_x = TOI(dwarf.x) + DW_W / 2;
+            enter_y = TOI(dwarf.y) + DW_H / 2;
             sfx_play(SFX_CLEAR);
-            set_state(ST_CLEAR, 60);
+            set_state(ST_CLEAR, CLEAR_FRAMES);
         }
     }
 }
@@ -468,6 +511,9 @@ static void set_state(u8 state, u16 timer)
 {
     game.state = state;
     game.timer = timer;
+    /* lo schermo si spegne solo fra una cava e l'altra, e ci pensa ST_CLEAR:
+       ovunque altro si torna alla luce piena */
+    if (state != ST_CLEAR) fade_want = 8;
     switch (state) {
     case ST_PLAY:
         window_rows(0);
@@ -479,7 +525,7 @@ static void set_state(u8 state, u16 timer)
         break;
     case ST_CLEAR:
         window_rows(0);
-        overlay_message(TXT_CLEARED, 0);
+        /* niente cartello subito: prima il nano deve sparire nel portale */
         break;
     case ST_TITLE:
         window_rows(1);
@@ -585,6 +631,24 @@ static void draw_imps(void)
         sprite_add(TOI(im->x) - 12 - game.cam_x,
                    TOI(im->y) - 12 - game.cam_y + HUD_H,
                    3, 3, TILE_ATTR(tile, 2, 0, 0, 0));
+
+        /* Quanto manca al risveglio: nell'originale è un cerchio attorno allo
+           spiritello, qui una barra sopra la testa — due celle da otto passi
+           l'una, che il VDP disegna con un disegno già pronto per livello. */
+        if (im->stun && arena->stun) {
+            u16 left = (u16)(((u32)im->stun * 16) / arena->stun);
+            s16 bx = TOI(im->x) - 8 - game.cam_x;
+            s16 by = TOI(im->y) - 24 - game.cam_y + HUD_H;
+            u8 c;
+            if (left > 16) left = 16;
+            for (c = 0; c < 2; c++) {
+                s16 fill = (s16)left - (s16)(c * 8);
+                if (fill < 0) fill = 0;
+                if (fill > 8) fill = 8;
+                sprite_add((s16)(bx + c * 8), by, 1, 1,
+                           TILE_ATTR(TILE_BAR + fill, 1, 0, 0, 0));
+            }
+        }
     }
 }
 
@@ -645,11 +709,19 @@ static void draw_crates(void)
     }
 }
 
-/* Frecce ai bordi per il macchinario e il portale quando sono fuori vista. */
+/* Frecce ai bordi per il macchinario e il portale quando sono fuori vista.
+   La freccia è una sola, da 16x16, che punta a destra: il VDP la ribalta per
+   le altre tre direzioni. Rispetto a un pallino dice anche da che parte
+   guardare, che è tutto il punto. */
+#define MARK_M 12                       /* quanto sta staccata dal bordo */
+
 static void draw_markers(void)
 {
     s16 targets[2][2];
     u8 n = 0, i;
+    /* un respiro lento, così l'occhio la trova senza che lampeggi */
+    s16 bob = (s16)((sin_t((u8)(game.time * 3)) * 3) >> 8);
+
     if (dwarf.carrying >= 0 && has_machine) {
         targets[n][0] = intake_x;
         targets[n][1] = intake_y;
@@ -661,20 +733,65 @@ static void draw_markers(void)
         n++;
     }
     for (i = 0; i < n; i++) {
-        s16 sx = targets[i][0] - game.cam_x;
-        s16 sy = targets[i][1] - game.cam_y;
-        if (sx >= 8 && sx < SCREEN_W - 8 && sy >= 8 && sy < VIEW_H - 8) continue;
-        if (sx < 8) sx = 8;
-        if (sx > SCREEN_W - 16) sx = SCREEN_W - 16;
-        if (sy < 8) sy = 8;
-        if (sy > VIEW_H - 16) sy = VIEW_H - 16;
-        if (game.time & 8)
-            sprite_add(sx, (s16)(sy + HUD_H), 1, 1,
-                       TILE_ATTR(TILE_SPARK, 1, 0, 0, 0));
+        s16 tx = targets[i][0] - game.cam_x;
+        s16 ty = targets[i][1] - game.cam_y;
+        s16 ax = tx, ay = ty, dx, dy;
+        u16 tile;
+        u8 hf = 0, vf = 0;
+
+        if (tx >= 8 && tx < SCREEN_W - 8 && ty >= 8 && ty < VIEW_H - 8) continue;
+        if (ax < MARK_M) ax = MARK_M;
+        if (ax > SCREEN_W - MARK_M) ax = SCREEN_W - MARK_M;
+        if (ay < MARK_M) ay = MARK_M;
+        if (ay > VIEW_H - MARK_M) ay = VIEW_H - MARK_M;
+
+        /* punta verso il bersaglio: comanda lo scostamento più grande */
+        dx = tx - ax;
+        dy = ty - ay;
+        if ((dx < 0 ? -dx : dx) >= (dy < 0 ? -dy : dy)) {
+            tile = TILE_ARROW_R;
+            hf = (dx < 0);
+            ax += hf ? -bob : bob;
+        } else {
+            tile = TILE_ARROW_U;
+            vf = (dy > 0);
+            ay += vf ? bob : -bob;
+        }
+        sprite_add((s16)(ax - 8), (s16)(ay - 8 + HUD_H), 2, 2,
+                   TILE_ATTR(tile, 1, 0, hf, vf));
     }
 }
 
-static void draw_world_sprites(u8 with_dwarf)
+/* Il nano risucchiato dal portale: parte da dov'era, gira attorno al centro
+   allargandosi e richiudendosi, si capovolge di continuo e all'ultimo giro
+   sparisce dentro. Gli sprite non si possono rimpicciolire, ma un vortice che
+   si chiude racconta la stessa cosa. Lo sprite del portale sta prima nella
+   lista, quindi gli passa davanti: il nano ci finisce dietro. */
+static void draw_dwarf_portal(u16 t)
+{
+    s16 cx, cy, bx, by, r, sx, sy;
+    u16 tile, k;
+    u8 a;
+
+    if (t >= SPIRAL_FRAMES) return;                 /* è dentro: non c'è più */
+    k = (u16)((t * 256) / SPIRAL_FRAMES);           /* 0..256 */
+    cx = TOI(portal_x);
+    cy = TOI(portal_y) - 30;
+    /* il centro del vortice scivola da lui al cuore del portale */
+    bx = (s16)(enter_x + (((cx - enter_x) * (s16)k) >> 8));
+    by = (s16)(enter_y + (((cy - enter_y) * (s16)k) >> 8));
+    /* il raggio nasce e muore a zero: comincia dove stava e finisce al centro */
+    r = (s16)((26 * sin_t((u8)(k >> 1))) >> 8);
+    a = (u8)(t * 9);                                /* poco più di un giro e mezzo */
+    sx = (s16)(bx + ((cos_t(a) * r) >> 8) - 16 - game.cam_x);
+    sy = (s16)(by + ((sin_t(a) * r) >> 8) - 16 - game.cam_y + HUD_H);
+    tile = TILE_DWARF_AIR + ((t >> 2) & 1) * DWARF_FRAME_TILES;
+    sprite_add(sx, sy, 4, 4, TILE_ATTR(tile, 1, 0, (a & 128) != 0, 0));
+}
+
+enum { DWARF_NONE, DWARF_PLAY, DWARF_PORTAL };
+
+static void draw_world_sprites(u8 mode, u16 t)
 {
     sprite_reset();
     draw_portal();
@@ -682,9 +799,10 @@ static void draw_world_sprites(u8 with_dwarf)
     draw_plats();
     draw_blocks();
     draw_imps();
-    if (with_dwarf) draw_dwarf();
+    if (mode == DWARF_PLAY) draw_dwarf();
+    else if (mode == DWARF_PORTAL) draw_dwarf_portal(t);
     particles_draw();
-    if (with_dwarf) draw_markers();
+    if (mode == DWARF_PLAY) draw_markers();
 }
 
 /* Il nano del titolo: martella, e lo spiritello schizza via a ogni colpo. */
@@ -836,13 +954,25 @@ void game_frame(void)
         game.elapsed++;
         update_play();
         particles_update();
-        if (game.state == ST_PLAY) draw_world_sprites(1);
+        if (game.state == ST_PLAY) draw_world_sprites(DWARF_PLAY, 0);
         break;
     case ST_DEAD:
     case ST_CLEAR:
         if (game.timer) game.timer--;
+        if (game.state == ST_CLEAR) {
+            u16 t = (u16)(CLEAR_FRAMES - game.timer);
+            /* il portale se lo tira dentro a scintille */
+            if (t < SPIRAL_FRAMES && (t & 3) == 0)
+                particles_burst(portal_x, portal_y - FIX(30), 1, 2, VEL(140));
+            if (t == SPIRAL_FRAMES) {
+                particles_ring(portal_x, portal_y - FIX(30), 8);
+                overlay_message(TXT_CLEARED, 0);
+            }
+            if (game.timer == FADE_FRAMES) fade_want = 0;
+        }
         particles_update();
-        draw_world_sprites(game.state == ST_CLEAR);
+        draw_world_sprites(game.state == ST_CLEAR ? DWARF_PORTAL : DWARF_NONE,
+                           (u16)(CLEAR_FRAMES - game.timer));
         if (game.timer == 0) {
             if (game.state == ST_DEAD) {
                 load_arena(game.index);
@@ -878,6 +1008,7 @@ void game_frame(void)
     if (game.state == ST_PLAY) arena_paint(game.cam_y, 0);
     vdp_scroll(ax, ay, bx, by);
     sprite_flush();
+    fade_step();
     if (hud_dirty && !window_full) {
         draw_hud();
         hud_dirty = 0;

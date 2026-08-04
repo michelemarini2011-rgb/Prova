@@ -372,6 +372,66 @@ def main():
     spark = bank.add(disc(nearest(1, (255, 226, 90)), 1.6))
     bank.add(disc(nearest(1, (255, 226, 90)), 0.8))     # scintilla che si spegne
 
+    # ---- disegni fatti a mano: la freccia dei bersagli fuori vista e la
+    # barra del torpore sopra la testa degli spiritelli
+    def paint(matrix):
+        """Una matrice di indici diventa disegni da 8x8, in ordine sprite."""
+        h = len(matrix)
+        w = len(matrix[0])
+        flat = bytearray(w * h)
+        for y in range(h):
+            for x in range(w):
+                flat[y * w + x] = matrix[y][x]
+        return bank.block(flat, w, h, 0, 0, w // 8, h // 8, order="col")[0]
+
+    def outlined(m, edge):
+        """Contorno scuro tutto attorno: sul cielo o sul terreno si legge
+        comunque."""
+        out = [row[:] for row in m]
+        for y in range(len(m)):
+            for x in range(len(m[0])):
+                if m[y][x]:
+                    continue
+                if any(m[y + dy][x + dx]
+                       for dy in (-1, 0, 1) for dx in (-1, 0, 1)
+                       if 0 <= y + dy < len(m) and 0 <= x + dx < len(m[0])):
+                    out[y][x] = edge
+        return out
+
+    def rot_ccw(m):
+        n = len(m)
+        return [[m[x][n - 1 - y] for x in range(n)] for y in range(n)]
+
+    gold = nearest(1, (255, 226, 90))
+    dark = nearest(1, (0, 0, 0))
+
+    arrow = [[0] * 16 for _ in range(16)]
+    for y in range(6, 10):                      # il gambo
+        for x in range(1, 9):
+            arrow[y][x] = gold
+    for x in range(8, 15):                      # la punta
+        k = 15 - x
+        for y in range(8 - k, 8 + k):
+            arrow[y][x] = gold
+    arrow = outlined(arrow, dark)
+    arrow_right = paint(arrow)                  # sinistra: la stessa, ribaltata
+    arrow_up = paint(rot_ccw(arrow))            # giù: la stessa, capovolta
+
+    # Nove livelli di riempimento: la barra è larga due celle, quindi ogni
+    # cella prende il suo pezzo di riempimento e insieme fanno sedici passi.
+    bar_base = None
+    for level in range(9):
+        cell = [[0] * 8 for _ in range(8)]
+        for y in range(2, 6):
+            for x in range(8):
+                cell[y][x] = dark               # il fondo dice quanto era pieno
+        for y in range(3, 5):
+            for x in range(level):
+                cell[y][x] = gold
+        t = paint(cell)
+        if bar_base is None:
+            bar_base = t
+
     # ---- carattere: una cella per lettera
     idx, w, h = indexed["font"]
     font_base = bank.add(bank.cut(idx, w, h, 0, 0))
@@ -537,6 +597,9 @@ def main():
         f.write(f"#define TILE_SOLID     {solid}\n")
         f.write(f"#define TILE_DUST      {dust}\n")
         f.write(f"#define TILE_SPARK     {spark}\n")
+        f.write(f"#define TILE_ARROW_R   {arrow_right}   /* 2x2, punta a destra */\n")
+        f.write(f"#define TILE_ARROW_U   {arrow_up}   /* 2x2, punta in alto */\n")
+        f.write(f"#define TILE_BAR       {bar_base}   /* 9 livelli, da vuoto a pieno */\n")
         f.write(f"#define TILE_CRATE     {crate[0]}\n")
         f.write(f"#define TILE_PLANK4    {strips[4]}\n")
         f.write(f"#define TILE_PLANK5    {strips[5]}\n")
