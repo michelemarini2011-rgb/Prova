@@ -173,9 +173,28 @@ static const u8 map3[] = {
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 };
 
+/* La lingua si sceglie qui: vedi src/strings.h e il Makefile. */
+#ifdef LANG_EN
+#define T(it, en) en
+#else
+#define T(it, en) it
+#endif
+
 const ArenaDef arenas[ARENA_COUNT] = {
-    { "La cava a due piani", "Si sale in altezza. La zattera di ferro va avanti e indietro da sola: sali quando passa.", map0, 32, 540, 25122, 29491 },
-    { "Il pozzo dei ciottoli", "I blocchi irti uccidono al tocco: spostali a martellate, \002 l'unico modo.", map1, 32, 480, 29491, 33860 },
-    { "La parete alta", "Un blocco pu\005 viaggiare su una piattaforma: guarda dove va prima di salirci.", map2, 48, 450, 32768, 38229 },
-    { "Il cantiere in cima", "Ultima cava: sette spiritelli, quattro piattaforme e punte dappertutto.", map3, 48, 390, 37137, 43691 },
+    { T("La cava a due piani", "The two-floor cave"),
+      T("Si sale in altezza. La zattera di ferro va avanti e indietro da sola: sali quando passa.",
+        "The way out is up. The plank raft goes back and forth on its own: hop on as it passes."),
+      map0, 32, 540, 25122, 29491 },
+    { T("Il pozzo dei ciottoli", "The pit of pebbles"),
+      T("I blocchi irti uccidono al tocco: spostali a martellate, \002 l'unico modo.",
+        "The spiked blocks kill on touch: shift them with the hammer, it is the only way."),
+      map1, 32, 480, 29491, 33860 },
+    { T("La parete alta", "The high wall"),
+      T("Un blocco pu\005 viaggiare su una piattaforma: guarda dove va prima di salirci.",
+        "A block can travel on a moving plank: look where it is going before you step on."),
+      map2, 48, 450, 32768, 38229 },
+    { T("Il cantiere in cima", "The yard up top"),
+      T("Ultima cava: sette spiritelli, quattro piattaforme e punte dappertutto.",
+        "Last cave: seven imps, four moving planks and spikes everywhere."),
+      map3, 48, 390, 37137, 43691 },
 };

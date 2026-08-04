@@ -20,7 +20,9 @@ ABS = re.compile(r"(?:^|[ ,(])([0-9a-f]{4,8}) <")
 
 
 def main(elf: str) -> int:
-    out = subprocess.run(["m68k-linux-gnu-objdump", "-d", elf],
+    # solo il codice: le costanti (.rodata) sono testo e numeri, e a leggerle
+    # come istruzioni saltano fuori indirizzi dispari che non esistono
+    out = subprocess.run(["m68k-linux-gnu-objdump", "-d", "-j", ".text", elf],
                          capture_output=True, text=True, check=True).stdout
     bad = []
     for line in out.splitlines():

@@ -61,12 +61,19 @@ def main():
                 f.write("    " + " ".join(f"{CODE[c]}," for c in r) + "\n")
             f.write("};\n\n")
 
+        # Le due lingue stanno insieme: sceglie il compilatore, con LANG_EN.
+        f.write("/* La lingua si sceglie qui: vedi src/strings.h e il Makefile. */\n")
+        f.write("#ifdef LANG_EN\n#define T(it, en) en\n#else\n"
+                "#define T(it, en) it\n#endif\n\n")
         f.write("const ArenaDef arenas[ARENA_COUNT] = {\n")
         for i, a in enumerate(arenas):
-            f.write("    { %s, %s, map%d, %d, %d, %d, %d },\n" % (
-                cstr(a["name"]), cstr(a["hint"]), i, len(a["rows"]),
-                int(round(a["stun"] * 60)),      # torpore in quadri
-                vel(a["speed"]), vel(a["platSpeed"])))
+            f.write("    { T(%s, %s),\n      T(%s,\n        %s),\n"
+                    "      map%d, %d, %d, %d, %d },\n" % (
+                        cstr(a["name"]), cstr(a["name_en"]),
+                        cstr(a["hint"]), cstr(a["hint_en"]),
+                        i, len(a["rows"]),
+                        int(round(a["stun"] * 60)),      # torpore in quadri
+                        vel(a["speed"]), vel(a["platSpeed"])))
         f.write("};\n")
 
     with open(os.path.join(ROOT, "res", "levels.h"), "w") as f:

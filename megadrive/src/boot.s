@@ -42,8 +42,15 @@
 
     .ascii  "SEGA MEGA DRIVE "                               | 0x100
     .ascii  "(C)CLDE 2026.AUG"                               | 0x110
+| Il titolo della cartuccia segue la lingua della ROM: LANG_EN arriva dal
+| Makefile (--defsym), perché il .s non passa dal preprocessore del C.
+.ifdef LANG_EN
+    .ascii  "HAMMER AND BOXES                                " | 0x120 nazionale
+    .ascii  "HAMMER AND BOXES                                " | 0x150 estero
+.else
     .ascii  "MARTELLO E SCATOLE                              " | 0x120 nazionale
     .ascii  "MARTELLO E SCATOLE                              " | 0x150 estero
+.endif
     .ascii  "GM 00000000-00"                                 | 0x180 seriale
     .word   0x0000                                           | 0x18E checksum
     .ascii  "J               "                               | 0x190 comandi

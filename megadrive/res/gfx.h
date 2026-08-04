@@ -3,8 +3,8 @@
 #define GFX_H
 #include "md.h"
 
-#define GFX_TILE_COUNT 1145
-extern const u32 gfx_tiles[9160];
+#define GFX_TILE_COUNT 1295
+extern const u32 gfx_tiles[10360];
 extern const u16 gfx_palettes[4][16];
 
 extern const u16 terrain_cells[];   /* 32 celle x 4 disegni */
@@ -14,6 +14,7 @@ extern const u16 ground_cells[];    /* 2 celle x 4 */
 extern const u16 machine_map[];     /* 8x8 celle */
 extern const u16 backdrop_map[];    /* 64x32 celle */
 extern const u16 logo_map[];        /* 32x8 celle */
+extern const u16 logo_map_en[];     /* lo stesso, in inglese */
 extern const u16 icon_cells[];      /* 4 icone x 4 disegni */
 
 #define TILE_FONT      6

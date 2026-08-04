@@ -2,6 +2,7 @@
    portale, telecamera, sprite e pannello. */
 #include "game.h"
 #include "gfx.h"
+#include "strings.h"
 
 #ifndef START_ARENA
 #define START_ARENA 0            /* si può partire da un'altra cava per provarla */
@@ -164,7 +165,7 @@ void game_on_hammer(fix px, fix py)
 static void game_lose(const char *reason)
 {
     sfx_play(SFX_LOSE);
-    game.death_msg = reason ? reason : "Gli spiritelli hanno avuto la meglio";
+    game.death_msg = reason ? reason : TXT_LOST;
     set_state(ST_DEAD, 96);
 }
 
@@ -241,7 +242,7 @@ static void check_spikes(void)
         hud_dirty = 1;
         particles_burst(dwarf.x + FIX(DW_W / 2), dwarf.y + FIX(DW_H / 2), 1, 8, VEL(200));
         sfx_play(SFX_HURT);
-        game_lose("Le punte del blocco non perdonano");
+        game_lose(TXT_SPIKES);
         return;
     }
 }
@@ -367,9 +368,10 @@ static void draw_hud(void)
     text_blit(hud_buf[0], 13, 40, "/", 1);
     text_num_blit(hud_buf[0], 14, 40, game.total, 1, 1);
     text_num_blit(hud_buf[1], 12, 40, hud_seconds, 3, 1);
-    text_blit(hud_buf[1], 16, 40, "s", 1);
+    text_blit(hud_buf[1], 16, 40, TXT_SECONDS_SHORT, 1);
 
-    text_blit(hud_buf[0], 33, 40, "cava", 1);
+    /* la parola cambia con la lingua: il numero resta incollato al bordo */
+    text_blit(hud_buf[0], (u16)(37 - text_len(TXT_CAVE)), 40, TXT_CAVE, 1);
     text_num_blit(hud_buf[0], 38, 40, (u16)(game.index + 1), 1, 1);
     n = text_len(name);
     if (n > 20) n = 20;
@@ -395,15 +397,15 @@ static void draw_title(void)
     /* il logo occupa 32 celle in larghezza: centrato, due righe più sotto */
     for (r = 0; r < 8; r++) {
         u16 line[32];
-        for (c = 0; c < 32; c++) line[c] = TILE_ATTR(logo_map[r * 32 + c], 1, 1, 0, 0);
+        for (c = 0; c < 32; c++) line[c] = TILE_ATTR(LOGO_MAP[r * 32 + c], 1, 1, 0, 0);
         vdp_map_row(VRAM_WINDOW, (u16)(3 + r), line, 32, 4);
     }
     panel(11, 11);
-    text_center(VRAM_WINDOW, 12, "PREMI START PER COMINCIARE", 1);
-    text_center(VRAM_WINDOW, 15, "croce direzionale: corri", 1);
-    text_center(VRAM_WINDOW, 17, "B salta   A o C martella", 1);
-    text_center(VRAM_WINDOW, 19, "gi\006 + B per scendere dalle assi", 1);
-    text_center(VRAM_WINDOW, 21, "START mette in pausa", 1);
+    text_center(VRAM_WINDOW, 12, TXT_START, 1);
+    text_center(VRAM_WINDOW, 15, TXT_HELP_MOVE, 1);
+    text_center(VRAM_WINDOW, 17, TXT_HELP_JUMP, 1);
+    text_center(VRAM_WINDOW, 19, TXT_HELP_DROP, 1);
+    text_center(VRAM_WINDOW, 21, TXT_HELP_PAUSE, 1);
 
     /* striscia di terreno in fondo: il nano ci sta sopra a martellare */
     for (r = 0; r < 2; r++) {
@@ -419,32 +421,43 @@ static void draw_title(void)
     }
 }
 
+/* Una parola e un numero, centrati insieme. Le colonne non si possono più
+   scrivere a mano: "martellate" e "blows" non sono lunghe uguali. */
+static void label_num(u16 row, const char *label, u16 value, u8 digits)
+{
+    u16 n = text_len(label);
+    u16 col = (u16)((40 - (n + 1 + digits)) / 2);
+    text_put(VRAM_WINDOW, col, row, label, 1);
+    text_number(VRAM_WINDOW, (u16)(col + n + 1), row, value, digits, 1);
+}
+
+static void num_label(u16 row, u16 value, u8 digits, const char *label)
+{
+    u16 n = text_len(label);
+    u16 col = (u16)((40 - (digits + 1 + n)) / 2);
+    text_number(VRAM_WINDOW, col, row, value, digits, 1);
+    text_put(VRAM_WINDOW, (u16)(col + digits + 1), row, label, 1);
+}
+
 static void draw_card(void)
 {
     text_clear(VRAM_WINDOW, 0);
     switch (game.state) {
     case ST_INTRO:
         panel(7, 16);
-        text_put(VRAM_WINDOW, 17, 8, "cava", 1);
-        text_number(VRAM_WINDOW, 22, 8, (u16)(game.index + 1), 1, 1);
+        label_num(8, TXT_CAVE, (u16)(game.index + 1), 1);
         text_center(VRAM_WINDOW, 10, arena->name, 1);
         text_wrap(VRAM_WINDOW, 13, arena->hint, 1, 34);
-        text_put(VRAM_WINDOW, 6, 20, "spiritelli da inscatolare:", 1);
-        text_number(VRAM_WINDOW, 33, 20, game.total, 1, 1);
+        label_num(20, TXT_IMPS_TO_BOX, game.total, 1);
         break;
     case ST_FINALE:
         panel(6, 16);
-        text_center(VRAM_WINDOW, 8, "TUTTI INSCATOLATI", 1);
-        text_center(VRAM_WINDOW, 11, "quattro cave ripulite in", 1);
-        text_number(VRAM_WINDOW, 17, 13, (u16)(game.elapsed / 60), 3, 1);
-        text_put(VRAM_WINDOW, 21, 13, "secondi", 1);
-        text_center(VRAM_WINDOW, 15, "martellate:", 1);
-        text_number(VRAM_WINDOW, 26, 15, game.hammers, 3, 1);
-        if (game.best) {
-            text_put(VRAM_WINDOW, 13, 17, "record:", 1);
-            text_number(VRAM_WINDOW, 21, 17, game.best, 3, 1);
-        }
-        text_center(VRAM_WINDOW, 20, "START per ricominciare", 1);
+        text_center(VRAM_WINDOW, 8, TXT_FINALE, 1);
+        text_center(VRAM_WINDOW, 11, TXT_FOUR_CAVES, 1);
+        num_label(13, (u16)(game.elapsed / 60), 3, TXT_SECONDS);
+        label_num(15, TXT_HAMMERS, game.hammers, 3);
+        if (game.best) label_num(17, TXT_BEST, game.best, 3);
+        text_center(VRAM_WINDOW, 20, TXT_AGAIN, 1);
         break;
     default:
         break;
@@ -462,11 +475,11 @@ static void set_state(u8 state, u16 timer)
         break;
     case ST_DEAD:
         window_rows(0);
-        overlay_message(game.death_msg, "si ricomincia la cava...");
+        overlay_message(game.death_msg, TXT_RETRY);
         break;
     case ST_CLEAR:
         window_rows(0);
-        overlay_message("cava ripulita!", 0);
+        overlay_message(TXT_CLEARED, 0);
         break;
     case ST_TITLE:
         window_rows(1);
@@ -793,7 +806,7 @@ void game_frame(void)
         } else if (game.state == ST_PLAY) {
             game.paused = !game.paused;
             if (game.paused) {
-                overlay_message("pausa", "START riprende   A ricomincia");
+                overlay_message(TXT_PAUSED, TXT_PAUSE_HELP);
             } else {
                 arena_paint(game.cam_y, 1);   /* si ripulisce il messaggio */
                 hud_dirty = 1;

@@ -83,6 +83,7 @@ condivisa fra grafica e collisioni.
 ## Altro nel repository
 
 `megadrive/` contiene una cosa diversa: la conversione del gioco *Martello &
-Scatole* in una cartuccia per Sega Mega Drive (`megadrive/martello.bin`, da
-aprire con un emulatore). I dettagli sono nel suo
-[README](megadrive/README.md).
+Scatole* in una cartuccia per Sega Mega Drive, da aprire con un emulatore. Ci
+sono due ROM, identiche tranne che nella lingua: `megadrive/martello.bin` in
+italiano e `megadrive/hammer.bin` in inglese (*Hammer & Boxes*). I dettagli
+sono nel suo [README](megadrive/README.md).

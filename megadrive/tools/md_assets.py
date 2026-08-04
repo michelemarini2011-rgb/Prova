@@ -44,6 +44,11 @@ GROUPS = {
 }
 SAMPLES = 12000          # campioni per unità di peso, per il median cut
 
+# Immagini che entrano in una tavolozza ma non partecipano a sceglierne i
+# colori: il logo inglese è fatto con gli stessi due colori di quello italiano,
+# quindi non ha niente da chiedere e così le tavolozze restano identiche.
+GUESTS = {1: ["logo_en"]}
+
 FONT_CHARS = ([chr(c) for c in range(32, 127)] +
               ["à", "è", "é", "ì", "ò", "ù"])
 
@@ -256,31 +261,34 @@ def main():
     os.makedirs(RES, exist_ok=True)
     os.makedirs(PREVIEW, exist_ok=True)
 
+    # nome dell'immagine -> tavolozza in cui finisce
+    belongs = {n: pal for pal, names in GROUPS.items() for n, _w in names}
+    belongs.update({n: pal for pal, names in GUESTS.items() for n in names})
+
     raw = {}
-    for names in GROUPS.values():
-        for n, _w in names:
-            if n == "font":
-                raw[n] = render_font()
-            elif n == "backdrop":
-                # Metà piano: l'altra metà è la stessa, ribaltata dal VDP.
-                # Media d'area invece di Lanczos: quest'ultimo, sul bordo fra
-                # nuvola e cielo, inventa un alone che diventa una frangia.
-                raw[n] = half(load(n), (256, 256), Image.BOX)
-            elif n == "logo":
-                raw[n] = half(load(n), (256, 64))
-            elif n == "hazard":
-                raw[n] = half(load(n), (24, 24))
-            elif n == "movplat":
-                raw[n] = wooden(half(load(n)))
-            elif n == "icons":
-                # le icone stanno nel pannello: fondo nero pieno, o si vedrebbe
-                # il cielo del piano di sfondo attraverso le parti trasparenti
-                small = half(load(n))
-                back = Image.new("RGBA", small.size, (0, 0, 0, 255))
-                back.alpha_composite(small)
-                raw[n] = back
-            else:
-                raw[n] = half(load(n))
+    for n in belongs:
+        if n == "font":
+            raw[n] = render_font()
+        elif n == "backdrop":
+            # Metà piano: l'altra metà è la stessa, ribaltata dal VDP.
+            # Media d'area invece di Lanczos: quest'ultimo, sul bordo fra
+            # nuvola e cielo, inventa un alone che diventa una frangia.
+            raw[n] = half(load(n), (256, 256), Image.BOX)
+        elif n.startswith("logo"):
+            raw[n] = half(load(n), (256, 64))
+        elif n == "hazard":
+            raw[n] = half(load(n), (24, 24))
+        elif n == "movplat":
+            raw[n] = wooden(half(load(n)))
+        elif n == "icons":
+            # le icone stanno nel pannello: fondo nero pieno, o si vedrebbe
+            # il cielo del piano di sfondo attraverso le parti trasparenti
+            small = half(load(n))
+            back = Image.new("RGBA", small.size, (0, 0, 0, 255))
+            back.alpha_composite(small)
+            raw[n] = back
+        else:
+            raw[n] = half(load(n))
     for n in raw:
         raw[n] = posterize(raw[n])
 
@@ -289,10 +297,7 @@ def main():
         reserved = [(0, 0, 0)] if pal == 1 else []      # nero per i contorni
         palettes[pal] = build_palette([(raw[n], w) for n, w in names], reserved)
 
-    indexed = {}
-    for pal, names in GROUPS.items():
-        for n, _w in names:
-            indexed[n] = index_image(raw[n], palettes[pal])
+    indexed = {n: index_image(raw[n], palettes[pal]) for n, pal in belongs.items()}
 
     bank = Bank()
     out = {}          # nome -> (base, dati)
@@ -421,8 +426,12 @@ def main():
         line = left_half[row * 32:(row + 1) * 32]
         backdrop_map.extend(line)
         backdrop_map.extend(t | 0x0800 for t in reversed(line))
+    # Le due lingue portano ognuna il suo logo: sono parole diverse, ma i
+    # disegni uguali (il fondo, i pieni) se li spartiscono.
     idx, w, h = indexed["logo"]
     logo_map = bank.block(idx, w, h, 0, 0, 32, 8, dedup=True)
+    idx, w, h = indexed["logo_en"]
+    logo_map_en = bank.block(idx, w, h, 0, 0, 32, 8, dedup=True)
 
     # ------------------------------------------------------------ scrittura
     def carr(name, values, per_line=8):
@@ -462,6 +471,7 @@ def main():
         f.write(carr("machine_map", machine) + "\n\n")
         f.write(carr("backdrop_map", backdrop_map, 16) + "\n\n")
         f.write(carr("logo_map", logo_map, 16) + "\n\n")
+        f.write(carr("logo_map_en", logo_map_en, 16) + "\n\n")
         f.write(carr("icon_cells", [v for c in icons for v in c]) + "\n\n")
 
     with open(os.path.join(RES, "gfx.h"), "w") as f:
@@ -477,6 +487,7 @@ def main():
         f.write("extern const u16 machine_map[];     /* 8x8 celle */\n")
         f.write("extern const u16 backdrop_map[];    /* 64x32 celle */\n")
         f.write("extern const u16 logo_map[];        /* 32x8 celle */\n")
+        f.write("extern const u16 logo_map_en[];     /* lo stesso, in inglese */\n")
         f.write("extern const u16 icon_cells[];      /* 4 icone x 4 disegni */\n\n")
         f.write(f"#define TILE_FONT      {font_base}\n")
         f.write(f"#define FONT_CHARS     {len(FONT_CHARS)}\n")
@@ -501,7 +512,7 @@ def main():
 
     # ---- anteprime: le immagini così come le vedrà la console
     for name in raw:
-        pal = next(p for p, ns in GROUPS.items() if name in [n for n, _ in ns])
+        pal = belongs[name]
         idx, w, h = indexed[name]
         prev = Image.new("RGB", (w, h), (40, 40, 48))
         px = prev.load()

@@ -17,6 +17,15 @@ SECTIONS
         KEEP(*(.vectors))
         KEEP(*(.header))
         *(.text .text.*)
+        . = ALIGN(2);
+    } > rom
+
+    /* Le costanti stanno in una sezione a parte, non in mezzo al codice:
+       tools/checkalign.py disassembla la ROM per cercare gli accessi
+       disallineati, e una frase come "...of you s" si legge benissimo come
+       un'istruzione con un indirizzo dispari. */
+    .rodata :
+    {
         *(.rodata .rodata.*)
         . = ALIGN(2);
         _rom_data = .;

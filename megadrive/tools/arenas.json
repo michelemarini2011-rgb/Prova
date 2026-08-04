@@ -1,7 +1,9 @@
 [
  {
   "name": "La cava a due piani",
+  "name_en": "The two-floor cave",
   "hint": "Si sale in altezza. La zattera di ferro va avanti e indietro da sola: sali quando passa.",
+  "hint_en": "The way out is up. The plank raft goes back and forth on its own: hop on as it passes.",
   "stun": 9.0,
   "speed": 46.0,
   "platSpeed": 54.0,
@@ -42,7 +44,9 @@
  },
  {
   "name": "Il pozzo dei ciottoli",
+  "name_en": "The pit of pebbles",
   "hint": "I blocchi irti uccidono al tocco: spostali a martellate, è l'unico modo.",
+  "hint_en": "The spiked blocks kill on touch: shift them with the hammer, it is the only way.",
   "stun": 8.0,
   "speed": 54.0,
   "platSpeed": 62.0,
@@ -83,7 +87,9 @@
  },
  {
   "name": "La parete alta",
+  "name_en": "The high wall",
   "hint": "Un blocco può viaggiare su una piattaforma: guarda dove va prima di salirci.",
+  "hint_en": "A block can travel on a moving plank: look where it is going before you step on.",
   "stun": 7.5,
   "speed": 60.0,
   "platSpeed": 70.0,
@@ -140,7 +146,9 @@
  },
  {
   "name": "Il cantiere in cima",
+  "name_en": "The yard up top",
   "hint": "Ultima cava: sette spiritelli, quattro piattaforme e punte dappertutto.",
+  "hint_en": "Last cave: seven imps, four moving planks and spikes everywhere.",
   "stun": 6.5,
   "speed": 68.0,
   "platSpeed": 80.0,

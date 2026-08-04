@@ -6,8 +6,10 @@ in C e assembly 68000 e compilata in una ROM da 512 KB.
 
 ## Giocare
 
-Il file da dare all'emulatore è **`martello.bin`** (va bene anche rinominarlo
-`.md` o `.gen`). Funziona con BlastEm, Genesis Plus GX, Kega Fusion, Exodus,
+Il file da dare all'emulatore è **`martello.bin`**, oppure **`hammer.bin`** se
+si preferisce l'inglese (va bene anche rinominarli `.md` o `.gen`). Le due ROM
+sono lo stesso gioco: cambiano le scritte, i nomi delle cave e il logo del
+titolo. Funzionano con BlastEm, Genesis Plus GX, Kega Fusion, Exodus,
 RetroArch e i mini-console basati su questi emulatori; l'intestazione della
 cartuccia dichiara le tre regioni, quindi non serve impostare niente.
 
@@ -34,8 +36,10 @@ rigenerare grafica e livelli):
 
 ```bash
 sudo apt install gcc-m68k-linux-gnu binutils-m68k-linux-gnu python3-pil kbd
-make            # produce martello.bin
-make assets     # rigenera res/gfx.* dai PNG in tools/png
+make            # produce martello.bin (italiano)
+make LANG=en    # produce hammer.bin (inglese)
+make both       # tutte e due
+make assets     # rigenera res/gfx.* e res/levels.* da tools/
 make run        # avvia la ROM in BlastEm
 ```
 
@@ -65,6 +69,7 @@ src/vdp.c         disegni, tavolozze, piani, sprite, scorrimento
 src/pad.c         lettura del joypad a tre tasti
 src/psg.c         effetti sonori sul generatore di suoni
 src/text.c        scritte (un disegno da 8x8 per lettera)
+src/strings.h     tutte le frasi, in italiano e in inglese
 src/arena.c       mappa della cava, disegno del terreno, scorrimento verticale
 src/entities.c    nano, spiritelli, blocchi irti, assi mobili
 src/game.c        stati, onda d'urto, macchinario, portale, pannello, sprite
@@ -73,6 +78,7 @@ res/gfx.*         disegni e tavolozze (generati)
 res/levels.*      le quattro cave (generate)
 tools/md_assets.py   converte i PNG dell'originale nel formato del VDP
 tools/md_levels.py   converte le mappe delle cave
+tools/make_logo_en.py disegna il logo della versione inglese
 tools/checkalign.py  cerca accessi disallineati nel codice compilato
 tools/fixrom.py      riempimento e checksum della cartuccia
 ```
@@ -113,6 +119,22 @@ pixel al secondo e un passo di 1/120 di secondo. Qui:
 Il piano di gioco del VDP è alto 256 pixel e le cave arrivano a 768: le righe
 di celle si ridipingono man mano che la vista sale, due per volta, dentro il
 ritorno di quadro.
+
+### Due lingue
+
+Le frasi stanno tutte in `src/strings.h`, i nomi e i suggerimenti delle cave in
+`tools/arenas.json` (campi `name_en` e `hint_en`). La lingua si sceglie
+compilando: `make` fa quella italiana, `make LANG=en` quella inglese, che
+definisce `LANG_EN` e prende l'altro ramo delle frasi. Cambia anche il titolo
+scritto nell'intestazione della cartuccia — quello che gli emulatori mostrano
+nell'elenco — e il logo del titolo, perché è un disegno e non una scritta:
+`tools/make_logo_en.py` ne fa uno uguale con le parole inglesi, e i due logo
+stanno tutti e due nella ROM (spartendosi i disegni ripetuti: costano 150
+celle in più su 1472).
+
+Le colonne delle schermate non si possono più contare a mano, perché
+«martellate» e «hammer blows» non sono lunghe uguali: le coppie parola-numero
+si centrano da sole (`label_num` in `src/game.c`).
 
 ### Stare dentro il quadro
 
@@ -174,7 +196,9 @@ dà un messaggio d'errore: la macchina si limita a piantarsi.
    centrali di un numero lungo, cioè ancora un accesso dispari. Con la virgola
    fissa 16.16 la parte intera è la parola alta, allineata. `make` passa
    comunque il codice compilato a `tools/checkalign.py`, che si accorgerebbe di
-   un altro caso.
+   un altro caso. Il controllo guarda solo `.text`: le costanti hanno una
+   sezione tutta loro (`link.ld`) perché una frase come *«...of you s»*, letta
+   come istruzione, sembra tale e quale un accesso a un indirizzo dispari.
 
 Se nonostante tutto il processore inciampa, `src/fault.c` disegna a schermo il
 tipo di eccezione, il punto del programma e l'indirizzo incriminato, invece di
