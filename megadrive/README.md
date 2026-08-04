@@ -47,6 +47,14 @@ senza un televisore.
 tools/shot.sh martello.bin prova.png 4 Return:6 wait:200 Right:60 a:6 shot
 ```
 
+`tools/record.sh` fa la stessa cosa ma registra qualche secondo quadro per
+quadro: serve per gli sfarfallii, che a occhio si vedono ma in una schermata
+sola no.
+
+```bash
+tools/record.sh martello.bin quadri/ 3 Return:6 wait:300 Right:60
+```
+
 ## Com'è fatto
 
 ```
@@ -127,6 +135,19 @@ del VDP letto a ogni fase, così si vede dove va il tempo) hanno indicato:
 
 Alla fine la cava più affollata (sette spiritelli, quattro blocchi, cinque
 assi) sta in circa 190 righe di schermo su 262.
+
+### Scrivere nella memoria video
+
+Il ritorno di quadro dura appena diciottomila cicli, e tutto quello che si
+vede deve entrare lì dentro. Scrivendo parola per parola il processore ne
+spende una trentina ciascuna: fra sprite, righe della cava e pannello si
+arrivava al limite, e la coda finiva mentre il raster disegnava già la barra
+in cima — per un quadro il pannello si vedeva a metà, cioè lo sfarfallio.
+
+Ora sprite, pannello e righe della cava vanno in **DMA**: il VDP si prende i
+dati da solo, un word ogni due cicli. Il pannello, in più, si compone in
+memoria e parte in due soli trasferimenti, così non esiste più l'istante in
+cui è stato cancellato ma non ancora riscritto.
 
 ### Aspettare il quadro
 

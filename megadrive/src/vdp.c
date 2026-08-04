@@ -116,6 +116,23 @@ void vdp_map_row(u16 plane, u16 row, const u16 *src, u16 count, u16 first_col)
     for (i = 0; i < count; i++) VDP_DATA_W = *src++;
 }
 
+/* Trasferimento in DMA dalla memoria di lavoro alla VRAM. Il VDP se lo fa da
+   solo, un word ogni due cicli: dentro il ritorno di quadro, che dura appena
+   diciottomila cicli, è la differenza fra starci e non starci. Scrivendo a
+   mano parola per parola il processore ne spende una trentina ciascuna, e la
+   coda delle scritture finiva oltre il bordo dello schermo — si vedeva il
+   pannello disegnato a metà per un quadro. */
+void vdp_dma(const void *src, u16 vram_addr, u16 words)
+{
+    u32 addr = (u32)src >> 1;                   /* il VDP conta a parole */
+    vdp_reg(0x13, (u8)(words & 0xFF));
+    vdp_reg(0x14, (u8)(words >> 8));
+    vdp_reg(0x15, (u8)(addr & 0xFF));
+    vdp_reg(0x16, (u8)((addr >> 8) & 0xFF));
+    vdp_reg(0x17, (u8)((addr >> 16) & 0x7F));   /* bit 7 a zero: dalla memoria */
+    VDP_CTRL_L = VDP_VRAM_W(vram_addr) | 0x80;  /* l'ultimo bit avvia il DMA */
+}
+
 void vdp_scroll(s16 ax, s16 ay, s16 bx, s16 by)
 {
     VDP_CTRL_L = VDP_VRAM_W(VRAM_HSCROLL);
@@ -150,22 +167,16 @@ void sprite_reset(void)
 
 void sprite_flush(void)
 {
-    u16 i;
-    VDP_CTRL_L = VDP_VRAM_W(VRAM_SPRITES);
     if (sprite_count == 0) {
         /* una voce sola, invisibile, che chiude la catena */
-        VDP_DATA_W = 0;
-        VDP_DATA_W = 0;
-        VDP_DATA_W = 0;
-        VDP_DATA_W = 0;
+        sprites[0].y = 0;
+        sprites[0].size = 0;
+        sprites[0].link = 0;
+        sprites[0].attr = 0;
+        sprites[0].x = 0;
+        vdp_dma(sprites, VRAM_SPRITES, 4);
         return;
     }
     sprites[sprite_count - 1].link = 0;
-    for (i = 0; i < sprite_count; i++) {
-        const Sprite *s = &sprites[i];
-        VDP_DATA_W = s->y;
-        VDP_DATA_W = (u16)(((u16)s->size << 8) | s->link);
-        VDP_DATA_W = s->attr;
-        VDP_DATA_W = s->x;
-    }
+    vdp_dma(sprites, VRAM_SPRITES, (u16)(sprite_count * 4));
 }

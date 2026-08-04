@@ -334,50 +334,49 @@ static void window_rows(u8 full)
     vdp_window_rows(full ? 28 : (HUD_H / 8));
 }
 
+/* Il pannello si compone in memoria e poi va al VDP in due colpi di DMA.
+   Scriverlo cella per cella dentro il ritorno di quadro non ci stava: la coda
+   delle scritture finiva mentre il raster disegnava già la barra, e per un
+   quadro se ne vedeva metà. */
+static u16 hud_buf[2][40];
+
+static void hud_icon(u16 col, const u16 *cell)
+{
+    hud_buf[0][col]     = TILE_ATTR(cell[0], 1, 1, 0, 0);
+    hud_buf[0][col + 1] = TILE_ATTR(cell[1], 1, 1, 0, 0);
+    hud_buf[1][col]     = TILE_ATTR(cell[2], 1, 1, 0, 0);
+    hud_buf[1][col + 1] = TILE_ATTR(cell[3], 1, 1, 0, 0);
+}
+
 static void draw_hud(void)
 {
-    u16 row[40];
-    u8 i;
     const char *name = arena ? arena->name : "";
-    u16 n;
+    u16 i, n;
 
-    for (i = 0; i < 40; i++) row[i] = SOLID_TILE;
-    vdp_map_row(VRAM_WINDOW, 0, row, 40, 0);
-    vdp_map_row(VRAM_WINDOW, 1, row, 40, 0);
+    for (i = 0; i < 40; i++) {
+        hud_buf[0][i] = SOLID_TILE;
+        hud_buf[1][i] = SOLID_TILE;
+    }
 
     /* cuori e scatole: le icone sono alte due celle e coprono tutta la barra */
-    for (i = 0; i < HEARTS; i++) {
-        const u16 *cell = &icon_cells[(i < game.hearts ? 0 : 1) * 4];
-        u16 top[2], bot[2];
-        top[0] = TILE_ATTR(cell[0], 1, 1, 0, 0);
-        top[1] = TILE_ATTR(cell[1], 1, 1, 0, 0);
-        bot[0] = TILE_ATTR(cell[2], 1, 1, 0, 0);
-        bot[1] = TILE_ATTR(cell[3], 1, 1, 0, 0);
-        vdp_map_row(VRAM_WINDOW, 0, top, 2, (u16)(1 + i * 2));
-        vdp_map_row(VRAM_WINDOW, 1, bot, 2, (u16)(1 + i * 2));
-    }
-    {
-        const u16 *cell = &icon_cells[2 * 4];
-        u16 top[2], bot[2];
-        top[0] = TILE_ATTR(cell[0], 1, 1, 0, 0);
-        top[1] = TILE_ATTR(cell[1], 1, 1, 0, 0);
-        bot[0] = TILE_ATTR(cell[2], 1, 1, 0, 0);
-        bot[1] = TILE_ATTR(cell[3], 1, 1, 0, 0);
-        vdp_map_row(VRAM_WINDOW, 0, top, 2, 9);
-        vdp_map_row(VRAM_WINDOW, 1, bot, 2, 9);
-    }
+    for (i = 0; i < HEARTS; i++)
+        hud_icon((u16)(1 + i * 2), &icon_cells[(i < game.hearts ? 0 : 1) * 4]);
+    hud_icon(9, &icon_cells[2 * 4]);
 
-    text_number(VRAM_WINDOW, 12, 0, game.boxed, 1, 1);
-    text_put(VRAM_WINDOW, 13, 0, "/", 1);
-    text_number(VRAM_WINDOW, 14, 0, game.total, 1, 1);
-    text_number(VRAM_WINDOW, 12, 1, hud_seconds, 3, 1);
-    text_put(VRAM_WINDOW, 16, 1, "s", 1);
+    text_num_blit(hud_buf[0], 12, 40, game.boxed, 1, 1);
+    text_blit(hud_buf[0], 13, 40, "/", 1);
+    text_num_blit(hud_buf[0], 14, 40, game.total, 1, 1);
+    text_num_blit(hud_buf[1], 12, 40, hud_seconds, 3, 1);
+    text_blit(hud_buf[1], 16, 40, "s", 1);
 
-    text_put(VRAM_WINDOW, 33, 0, "cava", 1);
-    text_number(VRAM_WINDOW, 38, 0, (u16)(game.index + 1), 1, 1);
+    text_blit(hud_buf[0], 33, 40, "cava", 1);
+    text_num_blit(hud_buf[0], 38, 40, (u16)(game.index + 1), 1, 1);
     n = text_len(name);
     if (n > 20) n = 20;
-    text_put(VRAM_WINDOW, (u16)(39 - n), 1, name, 1);
+    text_blit(hud_buf[1], (u16)(39 - n), 40, name, 1);
+
+    vdp_dma(hud_buf[0], VRAM_WINDOW, 40);
+    vdp_dma(hud_buf[1], (u16)(VRAM_WINDOW + PLANE_W * 2), 40);
 }
 
 /* Una fascia piena dietro al testo, per staccarlo dal cielo. */

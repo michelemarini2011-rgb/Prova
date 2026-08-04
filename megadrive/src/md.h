@@ -47,6 +47,7 @@ void vdp_load_tiles(u16 first, const u32 *data, u16 count);
 void vdp_load_palette(u8 index, const u16 *colors, u16 count);
 void vdp_fill_plane(u16 plane, u16 value);
 void vdp_map_row(u16 plane, u16 row, const u16 *src, u16 count, u16 first_col);
+void vdp_dma(const void *src, u16 vram_addr, u16 words);
 void vdp_set_tile(u16 plane, u16 col, u16 row, u16 value);
 void vdp_scroll(s16 plane_a_x, s16 plane_a_y, s16 plane_b_x, s16 plane_b_y);
 void vdp_display(u8 on);

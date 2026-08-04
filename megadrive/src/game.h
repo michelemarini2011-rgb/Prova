@@ -248,6 +248,8 @@ static inline s16 cos_t(u8 angle) { return sin_t((u8)(angle + 64)); }
 /* --------------------------------------------------------------- testo */
 void text_clear(u16 plane, u16 tile);
 void text_put(u16 plane, u16 col, u16 row, const char *s, u8 pal);
+void text_blit(u16 *row, u16 col, u16 width, const char *s, u8 pal);
+void text_num_blit(u16 *row, u16 col, u16 width, u16 value, u8 digits, u8 pal);
 void text_center(u16 plane, u16 row, const char *s, u8 pal);
 void text_number(u16 plane, u16 col, u16 row, u16 value, u8 digits, u8 pal);
 u16  text_len(const char *s);

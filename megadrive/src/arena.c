@@ -74,8 +74,12 @@ static void paint_row(s16 row)
         }
     }
 
-    vdp_map_row(VRAM_PLANE_A, (u16)(row * 2), top, COLS * 2, 0);
-    vdp_map_row(VRAM_PLANE_A, (u16)(row * 2 + 1), bottom, COLS * 2, 0);
+    /* in DMA: due righe da sessanta celle scritte a mano occupano da sole
+       mezzo ritorno di quadro */
+    vdp_dma(top, (u16)(VRAM_PLANE_A + ((row * 2) & (PLANE_H - 1)) * PLANE_W * 2),
+            COLS * 2);
+    vdp_dma(bottom, (u16)(VRAM_PLANE_A + ((row * 2 + 1) & (PLANE_H - 1)) * PLANE_W * 2),
+            COLS * 2);
 }
 
 /* Tiene dipinte le sedici righe attorno alla vista. Con 'all' ridipinge tutto
