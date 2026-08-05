@@ -23,8 +23,10 @@ static s16 enter_x, enter_y;    /* dov'era il nano quando ha toccato il portale 
 #define SOLID_TILE TILE_ATTR(TILE_SOLID, 1, 1, 0, 0)
 
 /* Il portale: quanto dura la scena fra una cava e l'altra. */
-#define CLEAR_FRAMES  102               /* 1,7 s in tutto */
-#define SPIRAL_FRAMES 46                /* il nano che viene risucchiato */
+#define CLEAR_FRAMES  126               /* 2,1 s in tutto */
+#define SPIRAL_FRAMES 66                /* il nano che viene risucchiato */
+#define SPIRAL_FRONT  50                /* fin qui gira davanti al portale */
+#define SPIRAL_R      46                /* quanto si allarga il vortice */
 #define FADE_FRAMES   18                /* la coda: lo schermo si spegne */
 
 static void set_state(u8 state, u16 timer);
@@ -687,6 +689,10 @@ static void draw_portal(void)
     if (!game.portal_open) return;
     sx = TOI(portal_x) - 24 - game.cam_x;
     sy = TOI(portal_y) - 64 - game.cam_y + HUD_H;
+    /* mentre inghiotte il nano l'ovale pulsa: due pixel bastano, e senza
+       toccare i disegni */
+    if (game.state == ST_CLEAR)
+        sy += (s16)((sin_t((u8)(game.time * 20)) * 3) >> 8);
     sprite_add(sx, sy, 3, 4, TILE_ATTR(TILE_PORTAL, 2, 0, 0, 0));
     sprite_add(sx, (s16)(sy + 32), 3, 4,
                TILE_ATTR(TILE_PORTAL + PORTAL_QUAD_TILES, 2, 0, 0, 0));
@@ -762,45 +768,59 @@ static void draw_markers(void)
     }
 }
 
-/* Il nano risucchiato dal portale: parte da dov'era, gira attorno al centro
-   allargandosi e richiudendosi, si capovolge di continuo e all'ultimo giro
-   sparisce dentro. Gli sprite non si possono rimpicciolire, ma un vortice che
-   si chiude racconta la stessa cosa. Lo sprite del portale sta prima nella
-   lista, quindi gli passa davanti: il nano ci finisce dietro. */
+/* Il nano risucchiato dal portale. Parte da dov'era, viene strappato in un
+   giro largo attorno al portale — largo apposta: dentro l'ovale, che è di
+   48x64, non si vedrebbe niente — e il giro si chiude fino al centro. Gli
+   sprite del Mega Drive non si possono rimpicciolire, ma un vortice che si
+   stringe racconta la stessa cosa. */
+static void portal_spin(u16 t, s16 *px, s16 *py)
+{
+    s16 cx = TOI(portal_x);
+    s16 cy = TOI(portal_y) - 30;
+    u16 k = (u16)((t * 256) / SPIRAL_FRAMES);       /* 0..256 */
+    /* il centro del vortice scivola da lui al cuore del portale */
+    s16 bx = (s16)(enter_x + (((cx - enter_x) * (s16)k) >> 8));
+    s16 by = (s16)(enter_y + (((cy - enter_y) * (s16)k) >> 8));
+    /* il raggio nasce e muore a zero: comincia dove stava e finisce al centro */
+    s16 r = (s16)((SPIRAL_R * sin_t((u8)(k >> 1))) >> 8);
+    u8  a = (u8)(t * 6);                            /* un giro e mezzo abbondante */
+    *px = (s16)(bx + ((cos_t(a) * r) >> 8));
+    *py = (s16)(by + ((sin_t(a) * r) >> 8));
+}
+
 static void draw_dwarf_portal(u16 t)
 {
-    s16 cx, cy, bx, by, r, sx, sy;
-    u16 tile, k;
-    u8 a;
+    s16 wx, wy;
+    u16 tile;
+    u8 a = (u8)(t * 6);
 
     if (t >= SPIRAL_FRAMES) return;                 /* è dentro: non c'è più */
-    k = (u16)((t * 256) / SPIRAL_FRAMES);           /* 0..256 */
-    cx = TOI(portal_x);
-    cy = TOI(portal_y) - 30;
-    /* il centro del vortice scivola da lui al cuore del portale */
-    bx = (s16)(enter_x + (((cx - enter_x) * (s16)k) >> 8));
-    by = (s16)(enter_y + (((cy - enter_y) * (s16)k) >> 8));
-    /* il raggio nasce e muore a zero: comincia dove stava e finisce al centro */
-    r = (s16)((26 * sin_t((u8)(k >> 1))) >> 8);
-    a = (u8)(t * 9);                                /* poco più di un giro e mezzo */
-    sx = (s16)(bx + ((cos_t(a) * r) >> 8) - 16 - game.cam_x);
-    sy = (s16)(by + ((sin_t(a) * r) >> 8) - 16 - game.cam_y + HUD_H);
+    portal_spin(t, &wx, &wy);
+    /* i fotogrammi in aria, e il verso che si rovescia a ogni mezzo giro:
+       da lontano è un nano che rotola dentro il portale */
     tile = TILE_DWARF_AIR + ((t >> 2) & 1) * DWARF_FRAME_TILES;
-    sprite_add(sx, sy, 4, 4, TILE_ATTR(tile, 1, 0, (a & 128) != 0, 0));
+    sprite_add((s16)(wx - 16 - game.cam_x),
+               (s16)(wy - 16 - game.cam_y + HUD_H),
+               4, 4, TILE_ATTR(tile, 1, 0, (a & 128) != 0, 0));
 }
 
 enum { DWARF_NONE, DWARF_PLAY, DWARF_PORTAL };
 
 static void draw_world_sprites(u8 mode, u16 t)
 {
+    /* Nella lista degli sprite chi viene prima sta davanti. Per quasi tutto il
+       vortice il nano va messo prima del portale, o l'ovale se lo mangerebbe e
+       non si vedrebbe girare; solo nell'ultimo pezzo passa dietro, ed è
+       esattamente il momento in cui deve sparirci dentro. */
     sprite_reset();
+    if (mode == DWARF_PORTAL && t < SPIRAL_FRONT) draw_dwarf_portal(t);
     draw_portal();
     draw_crates();
     draw_plats();
     draw_blocks();
     draw_imps();
     if (mode == DWARF_PLAY) draw_dwarf();
-    else if (mode == DWARF_PORTAL) draw_dwarf_portal(t);
+    else if (mode == DWARF_PORTAL && t >= SPIRAL_FRONT) draw_dwarf_portal(t);
     particles_draw();
     if (mode == DWARF_PLAY) draw_markers();
 }
@@ -961,11 +981,15 @@ void game_frame(void)
         if (game.timer) game.timer--;
         if (game.state == ST_CLEAR) {
             u16 t = (u16)(CLEAR_FRAMES - game.timer);
-            /* il portale se lo tira dentro a scintille */
-            if (t < SPIRAL_FRAMES && (t & 3) == 0)
-                particles_burst(portal_x, portal_y - FIX(30), 1, 2, VEL(140));
+            /* una scia di scintille sul giro che sta facendo: senza, il
+               vortice si legge solo se si guarda il nano */
+            if (t < SPIRAL_FRAMES && (t % 3) == 0) {
+                s16 wx, wy;
+                portal_spin(t, &wx, &wy);
+                particles_burst(FIX(wx), FIX(wy), 1, 1, VEL(70));
+            }
             if (t == SPIRAL_FRAMES) {
-                particles_ring(portal_x, portal_y - FIX(30), 8);
+                particles_ring(portal_x, portal_y - FIX(30), 10);
                 overlay_message(TXT_CLEARED, 0);
             }
             if (game.timer == FADE_FRAMES) fade_want = 0;

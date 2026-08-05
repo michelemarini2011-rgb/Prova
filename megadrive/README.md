@@ -144,10 +144,14 @@ dissolve — e che sul VDP si fanno con quello che c'è:
   per gli sprite sa fare entrambi i ribaltamenti. Prima c'era un pallino, che
   diceva dove ma non da che parte;
 - **il portale** si prende il nano con un vortice: parte da dov'era, gira
-  attorno al centro allargandosi e richiudendosi, e finisce dietro lo sprite
-  del portale — che sta prima nella lista, quindi gli passa davanti. Gli sprite
-  del Mega Drive non si possono rimpicciolire, ma un giro che si chiude
-  racconta la stessa cosa.
+  attorno al centro allargandosi fino a quarantasei pixel e poi richiudendosi,
+  con una scia di scintille sul giro che sta facendo. Gli sprite del Mega Drive
+  non si possono rimpicciolire, ma un giro che si stringe racconta la stessa
+  cosa. Il giro dev'essere largo e il nano dev'essere *davanti* al portale:
+  l'ovale è di 48x64 e alla prima prova se lo mangiava — l'animazione c'era e
+  non si vedeva. Solo nell'ultimo pezzo il nano passa dietro, ed è appunto il
+  momento in cui deve sparirci dentro. Nella lista degli sprite del VDP chi
+  viene prima sta davanti, quindi basta cambiargli posto.
 
 Poi lo schermo si spegne e si riaccende sulla cava dopo. Il Mega Drive non ha
 una dissolvenza: si riscrivono le quattro tavolozze scurite, otto livelli, un
