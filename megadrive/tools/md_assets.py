@@ -475,6 +475,99 @@ def main():
         belt_frames.append(cell)
     belt_base = paint(belt_frames[0])
 
+    # --- il pipistrello: ali su e ali giù (tavolozza degli spiritelli)
+    BATC = {"w": (145, 109, 182), "b": (72, 72, 109),
+            "e": (255, 255, 255), "m": (255, 109, 255)}
+    BAT_UP = [
+        "................",
+        "ww............ww",
+        "www..........www",
+        "wwww...bbb..wwww",
+        ".wwww.bbbbb.wwww",
+        ".wwwwbbbbbbbwwww",
+        "..wwwbebbbebwww.",
+        "..wwwbbbbbbbwww.",
+        "...wwbbmmmbbww..",
+        "....wbbbbbbbw...",
+        "......bbbbb.....",
+        ".......bbb......",
+        "................",
+        "................",
+        "................",
+        "................",
+    ]
+    BAT_DOWN = [
+        "................",
+        "................",
+        "................",
+        "......bbb.......",
+        "wwww.bbbbb.wwww.",
+        "wwwwwbbbbbbbwwww",
+        ".wwwwbebbbebwww.",
+        "..wwwbbbbbbbwww.",
+        "...wwbbmmmbbww..",
+        "....wbbbbbbbw...",
+        ".....wbbbbbw....",
+        "......bbb.......",
+        "................",
+        "................",
+        "................",
+        "................",
+    ]
+    bat_base = paint(from_chars(BAT_UP, BATC, 2))
+    paint(from_chars(BAT_DOWN, BATC, 2))
+
+    # --- la talpa che spunta dal terreno. Va nella tavolozza del nano, non in
+    # quella del terreno: lì dentro non c'è un colore scuro e gli occhi e il
+    # contorno sparivano nel bruno chiaro.
+    MOLEC = {"c": (145, 72, 36), "l": (218, 145, 36), "n": (255, 182, 182),
+             "g": (255, 255, 255), "e": (0, 0, 0)}
+    MOLE_BODY = [
+        "......cccc......",
+        "....cclllllcc...",
+        "...cclllllllcc..",
+        "...ceclllllcec..",
+        "...cclllllllcc..",
+        "..ccclllnnlllcc.",
+        "..ccccclnnlcccc.",
+        "...cccclllcccc..",
+        "..gcccccccccg...",
+        ".ggcccccccccgg..",
+        ".gg..cccccc..gg.",
+    ]
+    mole_base = None
+    for out in (0, 6):
+        rows = ["................"] * 16
+        for i, r in enumerate(MOLE_BODY):
+            y = 4 + out + i
+            if y < 16:
+                rows[y] = r
+        t = paint(from_chars(rows, MOLEC, 1))
+        if mole_base is None:
+            mole_base = t
+
+    # --- il carrello da miniera, anche lui nella tavolozza col nero
+    CARTC = {"d": (0, 0, 0), "c": (145, 72, 36), "l": (255, 182, 109),
+             "s": (109, 72, 36), "w": (0, 0, 0), "g": (218, 145, 36)}
+    cart = paint(from_chars([
+        "dd............................dd",
+        "dlddddddddddddddddddddddddddddld",
+        "dlcccccccccccccccccccccccccccccd",
+        "dlcsssssssssssssssssssssssssscld",
+        "dlcccccccccccccccccccccccccccccd",
+        "dlcsssssssssssssssssssssssssscld",
+        "dlcccccccccccccccccccccccccccccd",
+        "ddcccccccccccccccccccccccccccccd",
+        ".dsssssssssssssssssssssssssssdd.",
+        "..ddddddddddddddddddddddddddd...",
+        ".....dddd..........dddd.........",
+        "....ddgggd........ddgggd........",
+        "....dggggd........dggggd........",
+        ".....dddd..........dddd.........",
+        "................................",
+        "................................",
+    ], CARTC, 1))
+
     # La palla di fuoco che gira attorno al perno: due fotogrammi che pulsano,
     # a fasce concentriche. Un pallino da otto pixel non bastava — è un
     # ostacolo che costa un cuore e si deve vedere da lontano.
@@ -718,6 +811,9 @@ def main():
         f.write(f"#define TILE_BELT      {belt_base}   /* 2x2, si anima in DMA */\n")
         f.write(f"#define TILE_CRACK4    {cracks[4]}\n")
         f.write(f"#define TILE_CRACK5    {cracks[5]}\n")
+        f.write(f"#define TILE_BAT       {bat_base}   /* 2x2, due fotogrammi */\n")
+        f.write(f"#define TILE_MOLE      {mole_base}  /* 2x2, fuori e a met\u00e0 */\n")
+        f.write(f"#define TILE_CART      {cart}   /* 4x2 */\n")
         f.write(f"#define TILE_CRATE     {crate[0]}\n")
         f.write(f"#define TILE_PLANK4    {strips[4]}\n")
         f.write(f"#define TILE_PLANK5    {strips[5]}\n")

@@ -42,6 +42,7 @@ typedef s32 fix;                        /* 65536 = un pixel */
 #define MAX_BLOCKS    6
 #define MAX_PLATS     6
 #define MAX_ORBITS    6
+#define MAX_BATS      4
 #define MAX_PARTICLES 14
 #define HEARTS        3
 
@@ -98,7 +99,14 @@ enum { IMP_ROAM, IMP_STUNNED, IMP_CARRIED, IMP_BOXED };
 /* Le razze di spiritello. Lo svelto ha lo stesso disegno: corre una volta e
    mezzo, si sveglia prima e si porta dietro una scia di scintille, che è il
    modo di distinguerlo senza spendere un disegno. */
-enum { IMP_K_PLAIN, IMP_K_SWIFT, IMP_K_ARMOR };
+enum { IMP_K_PLAIN, IMP_K_SWIFT, IMP_K_ARMOR, IMP_K_MOLE };
+
+/* La talpa non vola e non insegue: sta nella sua buca e si affaccia a tempo.
+   Fuori la si martella come gli altri e da lì in poi è uno spiritello
+   qualunque; dentro non la si tocca. */
+#define MOLE_CYCLE 210                  /* tre secchi e mezzo in tutto */
+#define MOLE_OUT   130                  /* di cui poco più di due fuori */
+#define MOLE_RISE  10                   /* di quanto spunta */
 
 typedef struct {
     fix x, y, vx, vy;                   /* centro dello spiritello */
@@ -107,6 +115,7 @@ typedef struct {
     u8  state;
     u8  kind;
     u8  armor;                          /* l'elmo: il martello ci rimbalza */
+    u8  hidden;                         /* la talpa quando è sotto terra */
     u16 anim;
     u16 bob;                            /* fase, 8.8 di giro */
     u8  phase;
@@ -134,7 +143,13 @@ typedef struct {
 
 /* Tre tipi, stesso disegno: quella che va avanti e indietro, quella che sale
    e scende, e quella che c'è e non c'è. */
-enum { PLAT_SLIDE, PLAT_LIFT, PLAT_BLINK, PLAT_CRUMBLE };
+enum { PLAT_SLIDE, PLAT_LIFT, PLAT_BLINK, PLAT_CRUMBLE, PLAT_CART };
+
+/* Il carrello non parte da solo: lo si sposta a martellate, e il martello
+   diventa anche un attrezzo per andarsene in giro. */
+#define CART_PUSH VEL(300)
+#define CART_FRI  ACC(260)
+#define CART_MAX  VEL(340)
 
 /* L'asse che si sbriciola: quanto regge da quando ci sali, e quanto ci mette a
    tornare. Mezzo secondo scarso è il tempo di accorgersene e saltare via. */
@@ -168,6 +183,22 @@ typedef struct {
    soprattutto gli spiritelli storditi, che così arrivano al macchinario da
    soli. */
 #define BELT_PUSH VEL(95)
+
+/* ---------------------------------------------------------- pipistrelli */
+/* Non ti insegue: fa la spola sulla sua rotta e ti toglie un cuore se lo
+   tocchi. Non si stordisce e non si inscatola — è un ostacolo che si muove.
+   La martellata però lo fa girare di bocca. */
+#define BAT_SPEED VEL(150)
+#define BAT_R     PXI(22)
+#define BAT_BOB   PXI(30)
+
+typedef struct {
+    fix x, y;
+    fix home_y;
+    fix vx;
+    u8  phase;
+    u16 anim;
+} Bat;
 
 /* ------------------------------------------------------ scintille in giro */
 /* Una scintilla che gira attorno a un perno: nessun disegno nuovo (è quella
@@ -215,7 +246,8 @@ extern Imp imps[MAX_IMPS];
 extern Block blocks[MAX_BLOCKS];
 extern Plat plats[MAX_PLATS];
 extern Orbit orbits[MAX_ORBITS];
-extern u8 imp_count, block_count, plat_count, orbit_count;
+extern Bat bats[MAX_BATS];
+extern u8 imp_count, block_count, plat_count, orbit_count, bat_count;
 
 /* --------------------------------------------------------------- arena */
 extern const ArenaDef *arena;
@@ -278,6 +310,7 @@ void imp_break_free(Imp *im);
 void block_update(Block *b);
 void plat_update(Plat *p);
 void orbit_update(Orbit *o);
+void bat_update(Bat *b);
 void orbit_pos(const Orbit *o, s16 *x, s16 *y);
 Plat *land_on(fix x, fix y, s16 w, s16 h, fix vy, fix prev_bottom, u8 dropping);
 

@@ -31,11 +31,14 @@ INK = {
     "c": (190, 120, 60),        # asse che si sbriciola
     "n": (120, 90, 50),         # nastro verso destra
     "N": (95, 70, 40),          # nastro verso sinistra
+    "k": (200, 140, 70),        # carrello da miniera
     "x": (60, 60, 90),          # blocco irto
     "o": (255, 150, 40),        # perno della scintilla
     "S": (230, 90, 230),        # spiritello
     "V": (255, 60, 160),        # spiritello svelto
     "A": (170, 200, 230),       # spiritello con l'elmo
+    "p": (150, 110, 190),       # pipistrello
+    "t": (210, 160, 60),        # talpa
     "P": (255, 255, 255),       # partenza
     "O": (120, 255, 120),       # portale
     "M": (200, 200, 200),       # macchinario
@@ -44,9 +47,9 @@ INK = {
     "f": (240, 120, 160),       # fiore
 }
 
-IMPS = "SVA"                    # tutte le razze contano sullo stesso tetto
+IMPS = "SVAt"           # anche le talpe sono spiritelli                    # tutte le razze contano sullo stesso tetto
 LIMITS = [("x", 6, "blocchi"), ("o", 6, "scintille")]
-PLATS = "~|ijc"                 # tutti i tipi di asse mobile
+PLATS = "~|ijck"                 # tutti i tipi di asse mobile
 
 
 def check(a, index):

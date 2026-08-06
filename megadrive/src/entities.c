@@ -7,7 +7,8 @@ Imp   imps[MAX_IMPS];
 Block blocks[MAX_BLOCKS];
 Plat  plats[MAX_PLATS];
 Orbit orbits[MAX_ORBITS];
-u8 imp_count, block_count, plat_count, orbit_count;
+Bat   bats[MAX_BATS];
+u8 imp_count, block_count, plat_count, orbit_count, bat_count;
 
 void game_on_hammer(fix x, fix y);
 void game_on_jump(void);
@@ -243,6 +244,8 @@ void imp_reset(Imp *im)
     im->state = IMP_ROAM;
     im->stun = 0;
     im->armor = (u8)(im->kind == IMP_K_ARMOR);
+    im->hidden = 0;
+    if (im->kind == IMP_K_MOLE) im->bob = 0;
     im->anim = (u8)(rnd() & 3);
     im->bob = rnd();
     im->phase = (u8)rnd();
@@ -383,6 +386,25 @@ void imp_update(Imp *im, u8 think)
             im->vy = -VEL(180);
             im->grounded = 0;
         }
+        return;
+    }
+
+    /* La talpa: sta ferma nella buca e si affaccia a tempo. Il controllo va
+       qui, dopo il torpore: una volta martellata è uno spiritello come gli
+       altri e deve cadere, farsi portare e finire in scatola. */
+    if (im->kind == IMP_K_MOLE) {
+        s16 rise;
+        im->bob++;
+        if (im->bob >= MOLE_CYCLE) im->bob = 0;
+        if (im->bob < 16) rise = (s16)((im->bob * 3) >> 2);
+        else if (im->bob < MOLE_OUT - 16) rise = MOLE_RISE;
+        else if (im->bob < MOLE_OUT) rise = (s16)(((MOLE_OUT - im->bob) * 3) >> 2);
+        else rise = -1;
+        if (rise > MOLE_RISE) rise = MOLE_RISE;
+        im->hidden = (u8)(rise < 0);
+        im->x = im->home_x;
+        im->y = im->home_y - FIX(rise < 0 ? 0 : rise);
+        im->vx = im->vy = 0;
         return;
     }
 
@@ -612,12 +634,40 @@ static void plat_update_crumble(Plat *p)
     }
 }
 
+/* Il carrello: non ha un motore, ha l'attrito. Va dove l'ha mandato l'ultima
+   martellata e si ferma contro il terreno. */
+static void plat_update_cart(Plat *p)
+{
+    fix before = p->x;
+    s16 ty = (p->y + 2) >> CELL_BITS;
+    s16 lead;
+
+    p->dy = 0;
+    if (p->vx > CART_FRI) p->vx -= CART_FRI;
+    else if (p->vx < -CART_FRI) p->vx += CART_FRI;
+    else p->vx = 0;
+    if (p->vx > CART_MAX) p->vx = CART_MAX;
+    if (p->vx < -CART_MAX) p->vx = -CART_MAX;
+
+    p->x += p->vx;
+    if (p->x < 0) { p->x = 0; p->vx = 0; }
+    if (p->x + FIX(p->w) > FIX(WORLD_W)) { p->x = FIX(WORLD_W - p->w); p->vx = 0; }
+    lead = (p->vx > 0) ? (TOI(p->x) + p->w - 1) : TOI(p->x);
+    if (p->vx && arena_solid(lead >> CELL_BITS, ty)) {
+        p->x = (p->vx > 0) ? FIX((lead >> CELL_BITS) * CELL - p->w)
+                           : FIX(((lead >> CELL_BITS) + 1) * CELL);
+        p->vx = 0;
+    }
+    p->dx = p->x - before;
+}
+
 void plat_update(Plat *p)
 {
     fix before = p->x;
     s16 dir = (p->vx > 0) ? 1 : -1;
 
     if (p->kind == PLAT_LIFT) { plat_update_lift(p); return; }
+    if (p->kind == PLAT_CART) { plat_update_cart(p); return; }
     if (p->kind == PLAT_CRUMBLE) { plat_update_crumble(p); return; }
     if (p->kind == PLAT_BLINK) { plat_update_blink(p); return; }
     fix nx = p->x + p->vx;
@@ -667,6 +717,24 @@ void plat_update(Plat *p)
     p->x = nx;
     p->dx = p->x - before;
     p->dy = 0;
+}
+
+/* ---------------------------------------------------------- pipistrelli */
+
+void bat_update(Bat *b)
+{
+    s16 lead;
+    b->anim++;
+    b->phase = (u8)(b->phase + 3);
+    b->x += b->vx;
+    lead = (b->vx > 0) ? (TOI(b->x) + BAT_R) : (TOI(b->x) - BAT_R);
+    if (lead < 0 || lead >= WORLD_W ||
+        arena_solid(lead >> CELL_BITS, TOI(b->y) >> CELL_BITS)) {
+        b->vx = -b->vx;
+        b->x += b->vx;
+    }
+    /* l'ondeggiata verticale: metà del fascino, e costa una tabella di seni */
+    b->y = b->home_y + FIX((sin_t(b->phase) * BAT_BOB) >> 8);
 }
 
 /* ------------------------------------------------------ scintille in giro */

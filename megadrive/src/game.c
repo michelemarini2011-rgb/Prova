@@ -182,6 +182,31 @@ void game_on_hammer(fix px, fix py)
         particles_burst(b->x + FIX(BLK_SIZE / 2), b->y + FIX(BLK_SIZE), 0, 2, VEL(90));
     }
 
+    /* il carrello si sposta solo così: è un attrezzo, non un veicolo */
+    for (i = 0; i < plat_count; i++) {
+        Plat *p = &plats[i];
+        s16 dx, dy;
+        if (p->kind != PLAT_CART) continue;
+        dx = TOI(p->x) + p->w / 2 - ix;
+        dy = p->y + PLAT_H / 2 - iy;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if (dx > SHOCK_RX || dy > 26) continue;
+        p->vx += (TOI(p->x) + p->w / 2 < ix) ? -CART_PUSH : CART_PUSH;
+        particles_burst(p->x + FIX(p->w / 2), FIX(p->y + PLAT_H), 0, 3, VEL(110));
+    }
+
+    /* il pipistrello non si stordisce, ma la botta lo fa girare di bocca */
+    for (i = 0; i < bat_count; i++) {
+        Bat *b = &bats[i];
+        s16 dx = TOI(b->x) - ix, dy = TOI(b->y) - iy;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if (dx > SHOCK_RX || dy > SHOCK_RY) continue;
+        if ((TOI(b->x) < ix) == (b->vx > 0)) b->vx = -b->vx;
+        particles_burst(b->x, b->y, 1, 2, VEL(120));
+    }
+
     for (i = 0; i < imp_count; i++) {
         Imp *im = &imps[i];
         s16 dx, dy;
@@ -189,6 +214,7 @@ void game_on_hammer(fix px, fix py)
         u32 k2;
         u16 k;
         if (im->state == IMP_BOXED || im->state == IMP_CARRIED) continue;
+        if (im->hidden) continue;               /* la talpa è sotto terra */
         if (im->armor) {                        /* l'onda d'urto ci rimbalza */
             s16 adx = TOI(im->x) - ix, ady = TOI(im->y) - iy;
             if (adx * adx + ady * ady < (s16)(SHOCK_RX * SHOCK_RX)) {
@@ -282,7 +308,7 @@ static void check_contact(void)
     for (i = 0; i < imp_count; i++) {
         Imp *im = &imps[i];
         s16 nx, ny, dx, dy;
-        if (im->state != IMP_ROAM) continue;
+        if (im->state != IMP_ROAM || im->hidden) continue;
         nx = TOI(im->x);
         ny = TOI(im->y);
         if (nx < TOI(dwarf.x)) nx = TOI(dwarf.x);
@@ -326,6 +352,31 @@ static void check_orbits(void)
         sfx_play(SFX_HURT);
         particles_burst(FIX(sx), FIX(sy), 1, 4, VEL(150));
         if (game.hearts == 0) game_lose(TXT_BURNT);
+        return;
+    }
+}
+
+/* Il pipistrello costa un cuore come le scintille: si evita, non si combatte. */
+static void check_bats(void)
+{
+    u8 i;
+    if (dwarf.invuln) return;
+    for (i = 0; i < bat_count; i++) {
+        Bat *b = &bats[i];
+        s16 nx = TOI(b->x), ny = TOI(b->y), dx, dy;
+        if (nx < TOI(dwarf.x)) nx = TOI(dwarf.x);
+        if (nx > TOI(dwarf.x) + DW_W) nx = TOI(dwarf.x) + DW_W;
+        if (ny < TOI(dwarf.y)) ny = TOI(dwarf.y);
+        if (ny > TOI(dwarf.y) + DW_H) ny = TOI(dwarf.y) + DW_H;
+        dx = TOI(b->x) - nx;
+        dy = TOI(b->y) - ny;
+        if (dx * dx + dy * dy > BAT_R * BAT_R) continue;
+        dwarf_hurt(b->x);
+        game.hearts--;
+        hud_dirty = 1;
+        sfx_play(SFX_HURT);
+        particles_burst(b->x, b->y, 1, 4, VEL(150));
+        if (game.hearts == 0) game_lose(TXT_BAT);
         return;
     }
 }
@@ -421,6 +472,7 @@ static void update_play(void)
 
     for (i = 0; i < plat_count; i++) plat_update(&plats[i]);
     for (i = 0; i < orbit_count; i++) orbit_update(&orbits[i]);
+    for (i = 0; i < bat_count; i++) bat_update(&bats[i]);
     dwarf_update();
     for (i = 0; i < block_count; i++) block_update(&blocks[i]);
     for (i = 0; i < imp_count; i++)
@@ -431,6 +483,8 @@ static void update_play(void)
     check_spikes();
     if (game.state != ST_PLAY) return;
     check_orbits();
+    if (game.state != ST_PLAY) return;
+    check_bats();
     if (game.state != ST_PLAY) return;
     /* la pestata sull'elmo vale per questo quadro: niente contatto */
     if (!check_stomp()) check_contact();
@@ -499,9 +553,16 @@ static void draw_hud(void)
     text_num_blit(hud_buf[1], 12, 40, hud_seconds, 3, 1);
     text_blit(hud_buf[1], 16, 40, TXT_SECONDS_SHORT, 1);
 
-    /* la parola cambia con la lingua: il numero resta incollato al bordo */
-    text_blit(hud_buf[0], (u16)(37 - text_len(TXT_CAVE)), 40, TXT_CAVE, 1);
-    text_num_blit(hud_buf[0], 38, 40, (u16)(game.index + 1), 1, 1);
+    /* La parola cambia con la lingua e il numero resta incollato al bordo.
+       Due cifre dalla decima cava in poi: con una sola, la cava 10 si
+       presentava come «cava 0». */
+    {
+        u8 digits = (u8)(game.index >= 9 ? 2 : 1);
+        text_blit(hud_buf[0], (u16)(38 - digits - text_len(TXT_CAVE)), 40,
+                  TXT_CAVE, 1);
+        text_num_blit(hud_buf[0], (u16)(39 - digits), 40,
+                      (u16)(game.index + 1), digits, 1);
+    }
     n = text_len(name);
     if (n > 20) n = 20;
     text_blit(hud_buf[1], (u16)(39 - n), 40, name, 1);
@@ -574,10 +635,13 @@ static void draw_card(void)
     switch (game.state) {
     case ST_INTRO:
         panel(7, 16);
-        label_num(8, TXT_CAVE, (u16)(game.index + 1), 1);
+        label_num(8, TXT_CAVE, (u16)(game.index + 1),
+                  (u8)(game.index >= 9 ? 2 : 1));
         text_center(VRAM_WINDOW, 10, arena->name, 1);
-        text_wrap(VRAM_WINDOW, 13, arena->hint, 1, 34);
-        label_num(20, TXT_IMPS_TO_BOX, game.total, 1);
+        /* il conto degli spiritelli va sotto l'ultima riga del suggerimento,
+           che a volte sono tre e a volte quattro */
+        label_num((u16)(14 + text_wrap(VRAM_WINDOW, 13, arena->hint, 1, 34) * 2),
+                  TXT_IMPS_TO_BOX, game.total, 1);
         break;
     case ST_FINALE:
         panel(6, 16);
@@ -706,6 +770,29 @@ static void draw_imps(void)
         const Imp *im = &imps[i];
         u16 row, frame, tile;
         if (im->state == IMP_BOXED) continue;
+        if (im->kind == IMP_K_MOLE) {
+            /* la talpa: fuori del tutto o mezza dentro, e sotto terra niente */
+            if (im->hidden) continue;
+            sprite_add(TOI(im->x) - 8 - game.cam_x,
+                       TOI(im->y) - 8 - game.cam_y + HUD_H, 2, 2,
+                       TILE_ATTR(TILE_MOLE + (im->state == IMP_ROAM &&
+                                              im->bob < 16 ? 4 : 0), 1, 0, 0, 0));
+            if (im->stun && arena->stun) {
+                u16 left = (u16)(((u32)im->stun * 16) / arena->stun);
+                s16 bx = TOI(im->x) - 8 - game.cam_x;
+                s16 by = TOI(im->y) - 20 - game.cam_y + HUD_H;
+                u8 c;
+                if (left > 16) left = 16;
+                for (c = 0; c < 2; c++) {
+                    s16 fill = (s16)left - (s16)(c * 8);
+                    if (fill < 0) fill = 0;
+                    if (fill > 8) fill = 8;
+                    sprite_add((s16)(bx + c * 8), by, 1, 1,
+                               TILE_ATTR(TILE_BAR + fill, 1, 0, 0, 0));
+                }
+            }
+            continue;
+        }
         if (im->state == IMP_STUNNED || im->state == IMP_CARRIED) {
             u8 waking = (im->stun < IMP_ALERT);
             row = (waking && (game.time & 4)) ? 2 : 1;
@@ -769,6 +856,12 @@ static void draw_plats(void)
         const Plat *p = &plats[i];
         u16 base = (p->cells >= 5) ? TILE_PLANK5 : TILE_PLANK4;
         s16 shake = 0;
+        if (p->kind == PLAT_CART) {
+            sprite_add(TOI(p->x) - game.cam_x,
+                       (s16)(p->y - game.cam_y + HUD_H), 4, 2,
+                       TILE_ATTR(TILE_CART, 1, 0, 0, 0));
+            continue;
+        }
         if (p->kind == PLAT_CRUMBLE) {
             /* crepata da quando ci hai messo il piede, e sul finire trema */
             if (p->phase) {
@@ -811,6 +904,18 @@ static void draw_portal(void)
                TILE_ATTR(TILE_PORTAL + 2 * PORTAL_QUAD_TILES, 2, 0, 0, 0));
     sprite_add((s16)(sx + 24), (s16)(sy + 32), 3, 4,
                TILE_ATTR(TILE_PORTAL + 3 * PORTAL_QUAD_TILES, 2, 0, 0, 0));
+}
+
+static void draw_bats(void)
+{
+    u8 i;
+    for (i = 0; i < bat_count; i++) {
+        const Bat *b = &bats[i];
+        u16 tile = TILE_BAT + (((b->anim >> 3) & 1) ? 4 : 0);
+        sprite_add(TOI(b->x) - 8 - game.cam_x,
+                   TOI(b->y) - 8 - game.cam_y + HUD_H,
+                   2, 2, TILE_ATTR(tile, 2, 0, b->vx < 0, 0));
+    }
 }
 
 /* Le scintille che girano, col loro perno: due disegni che esistono gia'. */
@@ -947,6 +1052,7 @@ static void draw_world_sprites(u8 mode, u16 t)
     draw_crates();
     draw_plats();
     draw_blocks();
+    draw_bats();
     draw_orbits();
     draw_imps();
     if (mode == DWARF_PLAY) draw_dwarf();

@@ -3,9 +3,9 @@
 Conversione del gioco HTML5 *Martello & Scatole* in una cartuccia per Sega Mega
 Drive / Genesis: stessi movimenti, stessa regia, scritta in C e assembly 68000
 e compilata in una ROM da 512 KB. Le quattro cave dell'originale ci sono tutte,
-più sei nuove che introducono una cosa per volta — ascensori, assi a tempo,
-assi marce, nastro trasportatore, scintille, elmi — infilate fra quelle vecchie
-in ordine di difficoltà.
+più nove nuove che introducono una cosa per volta — ascensori, assi a tempo,
+assi marce, pipistrelli, nastro trasportatore, scintille, talpe, elmi,
+carrello da miniera — infilate fra quelle vecchie in ordine di difficoltà.
 
 ## Giocare
 
@@ -36,9 +36,13 @@ Nelle cave nuove: le **assi verdi** salgono e scendono da sole, le **gialle**
 ci sono e non ci sono (e lampeggiano prima di sparire), le **crepate** cedono
 mezzo secondo dopo che ci sali, il **nastro** spinge di lato tutto quello che
 ci sta sopra, le **palle di fuoco** girano attorno a un perno e costano un
-cuore. Fra gli spiritelli, quelli **con la scia** corrono una volta e mezzo e
-si svegliano prima, e quelli **con l'elmo** rimandano indietro le martellate:
-l'unico modo è saltargli in testa.
+cuore, i **pipistrelli** fanno la spola e costano un cuore anche loro (ma la
+martellata li fa girare di bocca), e il **carrello da miniera** si sposta solo
+a martellate — dalla parte opposta a dove batti. Fra gli spiritelli, quelli
+**con la scia** corrono una volta e mezzo e si svegliano prima, quelli **con
+l'elmo** rimandano indietro le martellate (l'unico modo è saltargli in testa) e
+le **talpe** stanno sotto terra e si affacciano a tempo: si prendono solo
+mentre sono fuori.
 
 Due mosse che conviene sapere: uno spiritello addormentato lasciato su un
 nastro **arriva al macchinario da solo**, e lo spiritello con l'elmo è l'unico
@@ -96,7 +100,7 @@ src/entities.c    nano, spiritelli, blocchi irti, assi mobili
 src/game.c        stati, onda d'urto, macchinario, portale, pannello, sprite
 src/fault.c       schermata di errore se il processore inciampa
 res/gfx.*         disegni e tavolozze (generati)
-res/levels.*      le dieci cave (generate)
+res/levels.*      le tredici cave (generate)
 tools/md_assets.py   converte i PNG dell'originale nel formato del VDP
 tools/md_levels.py   converte le mappe delle cave
 tools/make_logo_en.py disegna il logo della versione inglese
@@ -148,7 +152,7 @@ ritorno di quadro.
 
 ### Cave e cose nuove
 
-Le sei cave nuove costano in tutto una cinquantina di celle di disegni: quasi
+Le nove cave nuove costano in tutto un'ottantina di celle di disegni: quasi
 tutto è codice e mappe.
 
 - **l'ascensore** è l'asse mobile con la velocità sulla y invece che sulla x.
@@ -185,6 +189,20 @@ tutto è codice e mappe.
   testa: è l'unico che si può toccare impunemente, ma solo cadendogli addosso.
   L'elmo è uno sprite da 16x8 che sta *prima* di lui nella lista, o gli
   finirebbe dietro la testa invece che sopra.
+
+- **il pipistrello** non ragiona: fa la spola sulla sua rotta e ondeggia con la
+  tabella dei seni. Non si stordisce e non si inscatola — è l'ostacolo che si
+  muove, che nelle cave mancava (i blocchi irti stanno fermi e le assi sono
+  prevedibili);
+- **la talpa** è uno spiritello con un orario invece che con un'intelligenza:
+  sta nella sua buca, si affaccia per due secondi, e mentre è sotto non la
+  tocca nessuno. Il controllo sta *dopo* quello del torpore, così una volta
+  martellata torna a essere uno spiritello come gli altri e si lascia portare
+  in scatola;
+- **il carrello** è un'asse mobile senza motore: ha solo l'attrito, e va dove
+  l'ha mandato l'ultima martellata — dalla parte opposta a dove batti, come una
+  remata. Ci si può salire sopra e spingersi da soli, e il martello smette di
+  essere solo un'arma.
 
 Le mappe stanno in `tools/arenas.json` e si guardano con
 `tools/preview_levels.py`, che le disegna tutte in fila e controlla quello che

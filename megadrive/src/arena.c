@@ -137,6 +137,7 @@ void arena_load(u8 index)
     block_count = 0;
     plat_count = 0;
     orbit_count = 0;
+    bat_count = 0;
     has_machine = 0;
     machine_crates = 0;
     start_x = FIX(CELL * 2);
@@ -161,12 +162,26 @@ void arena_load(u8 index)
             case CELL_SPAWN:
             case CELL_SWIFT:
             case CELL_ARMOR:
+            case CELL_MOLE:
                 if (imp_count < MAX_IMPS) {
                     Imp *im = &imps[imp_count++];
                     im->home_x = cxpix;
                     im->home_y = FIX(cy * CELL + CELL / 2);
                     im->kind = (c == CELL_SWIFT) ? IMP_K_SWIFT :
-                               (c == CELL_ARMOR) ? IMP_K_ARMOR : IMP_K_PLAIN;
+                               (c == CELL_ARMOR) ? IMP_K_ARMOR :
+                               (c == CELL_MOLE)  ? IMP_K_MOLE : IMP_K_PLAIN;
+                }
+                break;
+            case CELL_BAT:
+                if (bat_count < MAX_BATS) {
+                    Bat *b = &bats[bat_count];
+                    b->x = cxpix;
+                    b->home_y = FIX(cy * CELL + CELL / 2);
+                    b->y = b->home_y;
+                    b->vx = (bat_count & 1) ? -BAT_SPEED : BAT_SPEED;
+                    b->phase = (u8)(bat_count * 64);
+                    b->anim = 0;
+                    bat_count++;
                 }
                 break;
             case CELL_ORBIT:
@@ -192,6 +207,7 @@ void arena_load(u8 index)
             case CELL_BLINK_A:
             case CELL_BLINK_B:
             case CELL_CRUMBLE:
+            case CELL_CART:
                 /* le celle di fila fanno una sola asse: si conta da sinistra */
                 if (arena_cell(cx - 1, cy) != c && plat_count < MAX_PLATS) {
                     Plat *p = &plats[plat_count++];
@@ -223,6 +239,8 @@ void arena_load(u8 index)
                             p->vy = (mover_index & 1) ? -v : v;
                         }
                         mover_index++;
+                    } else if (c == CELL_CART) {
+                        p->kind = PLAT_CART;
                     } else if (c == CELL_CRUMBLE) {
                         p->kind = PLAT_CRUMBLE;
                     } else {

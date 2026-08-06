@@ -22,6 +22,8 @@ CODE = {
     "|": 12, "i": 13, "j": 14, "V": 15, "o": 16,
     # assi che cedono, nastri (destra e sinistra), spiritelli con l'elmo
     "c": 17, "n": 18, "N": 19, "A": 20,
+    # pipistrelli, talpe, carrelli da miniera
+    "p": 21, "t": 22, "k": 23,
 }
 
 # Le lettere accentate non stanno in ASCII: nel gioco viaggiano come codici
@@ -93,7 +95,8 @@ def main():
                            ("DECOR_F", 11), ("LIFT", 12), ("BLINK_A", 13),
                            ("BLINK_B", 14), ("SWIFT", 15), ("ORBIT", 16),
                            ("CRUMBLE", 17), ("BELT_R", 18), ("BELT_L", 19),
-                           ("ARMOR", 20)]:
+                           ("ARMOR", 20), ("BAT", 21), ("MOLE", 22),
+                           ("CART", 23)]:
             f.write(f"#define CELL_{name:<8} {code}\n")
         f.write("""
 typedef struct {
