@@ -19,6 +19,12 @@ static u8  hud_dirty;
 static u8  window_full;         /* il riquadro copre tutto lo schermo? */
 static s16 enter_x, enter_y;    /* dov'era il nano quando ha toccato il portale */
 
+/* Il trucco per provare le cave: sul titolo, i tre tasti insieme scoprono la
+   scelta della cava. Resta acceso finché si spegne il gioco, così dopo una
+   morte o un finale si riparte da dov'eri. */
+static u8 select_on;
+static u8 select_cave;
+
 #define GRAB_DIST PXI(34)
 #define SOLID_TILE TILE_ATTR(TILE_SOLID, 1, 1, 0, 0)
 
@@ -580,6 +586,18 @@ static void panel(u16 first_row, u16 rows)
     for (i = 0; i < rows; i++) vdp_map_row(VRAM_WINDOW, first_row + i, row, 40, 0);
 }
 
+/* La riga della scelta, in fondo al titolo: «< cava  7 >». */
+static void draw_select_line(void)
+{
+    u16 n = text_len(TXT_CAVE);
+    u16 col = (u16)((40 - (n + 7)) / 2);
+    if (!select_on) return;
+    text_put(VRAM_WINDOW, col, 23, "<", 1);
+    text_put(VRAM_WINDOW, (u16)(col + 2), 23, TXT_CAVE, 1);
+    text_number(VRAM_WINDOW, (u16)(col + 3 + n), 23, (u16)(select_cave + 1), 2, 1);
+    text_put(VRAM_WINDOW, (u16)(col + 6 + n), 23, ">", 1);
+}
+
 static void draw_title(void)
 {
     u16 r, c;
@@ -609,6 +627,7 @@ static void draw_title(void)
         }
         vdp_map_row(VRAM_WINDOW, (u16)(26 + r), line, 40, 0);
     }
+    draw_select_line();
 }
 
 /* Una parola e un numero, centrati insieme. Le colonne non si possono più
@@ -722,7 +741,7 @@ static void game_start(void)
     game.hammers = 0;
     game.elapsed = 0;
     sfx_play(SFX_START);
-    load_arena(START_ARENA);
+    load_arena(select_on ? select_cave : (u8)START_ARENA);
 }
 
 static void game_finish(void)
@@ -1181,6 +1200,24 @@ void game_frame(void)
     pad_read();
     game.time++;
 
+    /* Il trucco: sul titolo A+B+C insieme scoprono la scelta della cava, e la
+       croce direzionale la cambia. Tre tasti insieme non si premono per caso,
+       e il titolo non lo dice a nessuno. */
+    if (game.state == ST_TITLE) {
+        u16 all = PAD_A | PAD_B | PAD_C;
+        if (!select_on && (pad_state & all) == all) {
+            select_on = 1;
+            select_cave = (u8)START_ARENA;
+            draw_select_line();
+            sfx_play(SFX_PORTAL);
+        } else if (select_on && (pad_pressed & (PAD_LEFT | PAD_RIGHT | PAD_UP | PAD_DOWN))) {
+            u8 back = (u8)((pad_pressed & (PAD_LEFT | PAD_DOWN)) != 0);
+            select_cave = (u8)((select_cave + (back ? ARENA_COUNT - 1 : 1)) % ARENA_COUNT);
+            draw_select_line();
+            sfx_play(SFX_GRAB);
+        }
+    }
+
     if (pad_pressed & PAD_START) {
         if (game.state == ST_TITLE) {
             game_start();
@@ -1203,6 +1240,12 @@ void game_frame(void)
         if (pad_pressed & PAD_A) {
             game.paused = 0;
             load_arena(game.index);
+        }
+        /* l'altra metà del trucco: in pausa, C passa alla cava dopo senza
+           doverla finire */
+        if ((pad_pressed & PAD_C) && select_on) {
+            game.paused = 0;
+            load_arena((u8)((game.index + 1) % ARENA_COUNT));
         }
         vdp_wait_vblank();
         return;

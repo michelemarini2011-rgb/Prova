@@ -54,6 +54,18 @@ trasportando, quanto manca prima che scappi), e la **freccia sul bordo dello
 schermo** punta verso il macchinario mentre si trasporta, verso il portale
 quando si è aperto.
 
+### Scegliere la cava
+
+Per provarne una senza rifarsi tutte le altre: **sul titolo, A + B + C
+insieme**. In fondo allo schermo compare `< cava  1 >`, la croce direzionale
+cambia il numero e START comincia da lì. Tre tasti insieme non si premono per
+sbaglio, e il titolo non lo dice a nessuno.
+
+Con il trucco acceso, in pausa **C salta alla cava dopo** senza doverla finire.
+La scelta resta finché non si spegne la console, quindi dopo una morte o un
+finale si riparte da dov'eri. Il cronometro finale, ovviamente, non vuol più
+dire niente.
+
 ## Costruire la ROM
 
 Serve un compilatore incrociato per 68000 e Python con Pillow (solo per
