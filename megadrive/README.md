@@ -117,6 +117,7 @@ tools/md_assets.py   converte i PNG dell'originale nel formato del VDP
 tools/md_levels.py   converte le mappe delle cave
 tools/make_logo_en.py disegna il logo della versione inglese
 tools/preview_levels.py  disegna le cave e ne controlla i limiti
+tools/reach.py       verifica che le cave si possano salire
 tools/checkalign.py  cerca accessi disallineati nel codice compilato
 tools/fixrom.py      riempimento e checksum della cartuccia
 ```
@@ -221,6 +222,15 @@ Le mappe stanno in `tools/arenas.json` e si guardano con
 il gioco dà per scontato: larghezza trenta, un solo punto di partenza, un solo
 portale, il macchinario che occupa davvero quattro celle per quattro, e i tetti
 delle strutture (otto spiritelli, sei blocchi, sei assi, sei scintille).
+
+Quello che il disegno **non** dice è se la cava si sale. Il nano salta tre celle
+e ne copre quattro di lato: se la prima asse è più su, dal punto di partenza non
+ci si stacca, e sulla mappa non si vede — sembra tutto ragionevole. Per questo
+c'è `tools/reach.py`, che simula la salita cella per cella e segnala le assi
+irraggiungibili, le talpe fuori tiro e il portale murato. Il modello va tarato
+sulle cave che si giocano da mesi: la prima versione bocciava anche quelle, e
+aveva ragione a metà — non teneva conto che un'asse mobile scorre da un muro
+all'altro e che chi ci sale ci va insieme.
 
 ### Quello che si vede senza leggerlo
 
