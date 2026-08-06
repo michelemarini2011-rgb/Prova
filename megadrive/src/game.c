@@ -54,24 +54,55 @@ static const u8 dim[9][8] = {
 
 static u8 fade_now = 8, fade_want = 8;
 
-/* Un passo ogni due quadri: otto livelli fanno poco più di un quarto di
-   secondo, il tempo giusto perché il buio si veda ma non annoi. */
-static void fade_step(void)
+/* I colori di adesso: quelli di base con sopra l'aria della cava. Stanno in
+   memoria di lavoro perché la sfumatura li rilegge a ogni passo. */
+static u16 cur_pal[4][16];
+static u8  pal_dirty;
+
+/* Ogni quattro cave cambia l'aria — giorno, tramonto, notte, alba — e si
+   ricolorano soltanto il terreno e il cielo. Il nano, le scritte e gli
+   spiritelli restano quelli: se cambiassero anche loro non si
+   riconoscerebbe più niente, e il buio non è un filtro sulla lente. */
+static void set_theme(u8 t)
 {
+    u8 p, i;
+    if (t >= THEME_COUNT) t = THEME_COUNT - 1;
+    for (p = 0; p < 4; p++)
+        for (i = 0; i < 16; i++) cur_pal[p][i] = gfx_palettes[p][i];
+    for (i = 0; i < 16; i++) {
+        cur_pal[0][i] = theme_palettes[t][0][i];
+        cur_pal[3][i] = theme_palettes[t][1][i];
+    }
+    pal_dirty = 1;
+}
+
+/* Manda le quattro tavolozze al VDP, scurite di quanto dice la sfumatura. */
+static void palette_upload(void)
+{
+    const u8 *d = dim[fade_now];
     u16 pal[16];
     u8 p, i;
-    if (fade_now == fade_want || (game.time & 1)) return;
-    fade_now = (u8)(fade_now < fade_want ? fade_now + 1 : fade_now - 1);
     for (p = 0; p < 4; p++) {
-        const u8 *d = dim[fade_now];
         for (i = 0; i < 16; i++) {
-            u16 c = gfx_palettes[p][i];
+            u16 c = cur_pal[p][i];
             pal[i] = (u16)((d[(c >> 9) & 7] << 9) |
                            (d[(c >> 5) & 7] << 5) |
                            (d[(c >> 1) & 7] << 1));
         }
         vdp_load_palette((u8)(p * 16), pal, 16);
     }
+    pal_dirty = 0;
+}
+
+/* Un passo ogni due quadri: otto livelli fanno poco più di un quarto di
+   secondo, il tempo giusto perché il buio si veda ma non annoi. */
+static void fade_step(void)
+{
+    if (fade_now != fade_want && !(game.time & 1)) {
+        fade_now = (u8)(fade_now < fade_want ? fade_now + 1 : fade_now - 1);
+        pal_dirty = 1;
+    }
+    if (pal_dirty) palette_upload();
 }
 
 /* ---------------------------------------------------------- particelle */
@@ -698,6 +729,7 @@ static void set_state(u8 state, u16 timer)
         break;
     case ST_TITLE:
         window_rows(1);
+        set_theme(0);                   /* il titolo è sempre di giorno */
         draw_title();
         break;
     default:
@@ -715,6 +747,7 @@ static void load_arena(u8 index)
 
     arena_load(index);
     game.index = index;
+    set_theme((u8)(index >> 2));        /* quattro cave per aria */
     dwarf_reset();
     for (i = 0; i < imp_count; i++) imp_reset(&imps[i]);
     for (i = 0; i < block_count; i++) {
@@ -1165,7 +1198,8 @@ void game_init(void)
     pad_init();
     psg_init();
 
-    for (i = 0; i < 4; i++) vdp_load_palette((u8)(i * 16), gfx_palettes[i], 16);
+    set_theme(0);
+    palette_upload();
     vdp_load_tiles(0, gfx_tiles, GFX_TILE_COUNT);
 
     /* il fondale sta tutto nel piano B e non cambia più */

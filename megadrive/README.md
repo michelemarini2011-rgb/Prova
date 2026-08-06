@@ -66,6 +66,21 @@ La scelta resta finché non si spegne la console, quindi dopo una morte o un
 finale si riparte da dov'eri. Il cronometro finale, ovviamente, non vuol più
 dire niente.
 
+### Quattro arie
+
+Ogni quattro cave cambia l'ora del giorno: **giorno** (1-4), **tramonto**
+(5-8), **notte** (9-12), **alba** (la tredicesima). I disegni sono sempre gli
+stessi — non ci starebbero quattro fondali in memoria video — a cambiare sono
+le tavolozze del terreno e del cielo, ricalcolate da `tools/md_assets.py` con
+due formule diverse: scaldare il cielo al tramonto e scurire la terra nello
+stesso colpo, con una formula sola, non si può. Il nano, le scritte e gli
+spiritelli restano i colori di sempre: se cambiassero anche loro non si
+riconoscerebbe più niente, e verrebbe fuori un filtro sulla lente invece che
+un'ora del giorno.
+
+Il cambio capita mentre lo schermo è già spento fra una cava e l'altra, quindi
+non si vede il passaggio: si riaccende e l'aria è un'altra.
+
 ## Costruire la ROM
 
 Serve un compilatore incrociato per 68000 e Python con Pillow (solo per

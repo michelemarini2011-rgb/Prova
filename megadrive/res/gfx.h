@@ -6,6 +6,8 @@
 #define GFX_TILE_COUNT 1383
 extern const u32 gfx_tiles[11064];
 extern const u16 gfx_palettes[4][16];
+#define THEME_COUNT 4
+extern const u16 theme_palettes[THEME_COUNT][2][16];
 
 extern const u16 terrain_cells[];   /* 32 celle x 4 disegni */
 extern const u16 oneway_cell[];

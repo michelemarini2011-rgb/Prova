@@ -61,6 +61,26 @@ def cracked(img):
         d.line([(x0, 0), (x0 + 2, 3), (x0 - 1, 7)], fill=dark)
     return out
 
+# Ogni quattro cave cambia l'aria: stessi disegni, altre tavolozze. Si
+# ricolorano solo il terreno e il cielo — il nano, le scritte e gli spiritelli
+# restano quelli, o non si riconoscerebbe più niente. Il terreno e il cielo
+# hanno due formule diverse: schiarire il cielo al tramonto e scurire la terra
+# nello stesso colpo non si può fare con una sola.
+def _c(v):
+    return max(0, min(7, int(round(v))))
+
+
+THEMES = [
+    ("giorno",   lambda r, g, b: (r, g, b),
+                 lambda r, g, b: (r, g, b)),
+    ("tramonto", lambda r, g, b: (_c(r * 0.95), _c(g * 0.68), _c(b * 0.35)),
+                 lambda r, g, b: (_c(r * 0.85 + 2.2), _c(g * 0.62 + 0.9), _c(b * 0.35))),
+    ("notte",    lambda r, g, b: (_c(r * 0.40), _c(g * 0.45 + 0.2), _c(b * 0.7 + 1.6)),
+                 lambda r, g, b: (_c(r * 0.35), _c(g * 0.42 + 0.2), _c(b * 0.7 + 1.2))),
+    ("alba",     lambda r, g, b: (_c(r * 0.62 + 1.8), _c(g * 0.68 + 1.8), _c(b * 0.62 + 2.6)),
+                 lambda r, g, b: (_c(r * 0.62 + 2.4), _c(g * 0.70 + 1.9), _c(b * 0.66 + 2.3))),
+]
+
 FONT_CHARS = ([chr(c) for c in range(32, 127)] +
               ["à", "è", "é", "ì", "ò", "ù"])
 
@@ -750,6 +770,21 @@ def main():
             f.write("    {" + ", ".join(f"0x{c:04X}" for c in cols) + "},\n")
         f.write("};\n\n")
 
+        # le tavolozze delle quattro arie: solo terreno (0) e cielo (3)
+        f.write(f"const u16 theme_palettes[{len(THEMES)}][2][16] = {{\n")
+        for name, ft, fs in THEMES:
+            f.write(f"    {{  /* {name} */\n")
+            for pal, fn in ((0, ft), (3, fs)):
+                cols = [0]
+                for col in palettes[pal]:
+                    r, g, b = (min(7, (v * 8) // 256) for v in col)
+                    r, g, b = fn(r, g, b)
+                    cols.append((b << 9) | (g << 5) | (r << 1))
+                cols += [0] * (16 - len(cols))
+                f.write("        {" + ", ".join(f"0x{c:04X}" for c in cols) + "},\n")
+            f.write("    },\n")
+        f.write("};\n\n")
+
         f.write(f"const u32 gfx_tiles[{len(bank.tiles) * 8}] = {{\n")
         for t in bank.tiles:
             words = [int.from_bytes(t[i:i + 4], "big") for i in range(0, 32, 4)]
@@ -786,7 +821,9 @@ def main():
         f.write("#ifndef GFX_H\n#define GFX_H\n#include \"md.h\"\n\n")
         f.write(f"#define GFX_TILE_COUNT {len(bank.tiles)}\n")
         f.write(f"extern const u32 gfx_tiles[{len(bank.tiles) * 8}];\n")
-        f.write("extern const u16 gfx_palettes[4][16];\n\n")
+        f.write("extern const u16 gfx_palettes[4][16];\n")
+        f.write(f"#define THEME_COUNT {len(THEMES)}\n")
+        f.write("extern const u16 theme_palettes[THEME_COUNT][2][16];\n\n")
         f.write("extern const u16 terrain_cells[];   /* 32 celle x 4 disegni */\n")
         f.write("extern const u16 oneway_cell[];\n")
         f.write("extern const u16 decor_cells[];     /* 3 celle x 4 */\n")
