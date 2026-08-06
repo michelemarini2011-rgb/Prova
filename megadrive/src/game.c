@@ -63,6 +63,31 @@ static u8  pal_dirty;
    ricolorano soltanto il terreno e il cielo. Il nano, le scritte e gli
    spiritelli restano quelli: se cambiassero anche loro non si
    riconoscerebbe più niente, e il buio non è un filtro sulla lente. */
+static u8 theme_now = 0xFF;      /* l'aria caricata in memoria video */
+static u8 screen_on;             /* per non accendere lo schermo prima del tempo */
+
+/* Il cielo di turno. I quattro disegni non ci stanno tutti insieme — sono
+   trecento celle l'uno e in memoria video ce n'è posto per una serie sola —
+   quindi si riscrive sempre sopra lo stesso pezzo. Il momento buono c'è già:
+   fra una cava e l'altra lo schermo è nero, e mentre è nero si può spegnere
+   il VDP e scrivere a tutta velocità senza che si veda niente. */
+static void sky_upload(u8 t)
+{
+    u16 i;
+    if (screen_on) vdp_display(0);
+    vdp_load_tiles(TILE_SKY, sky_tiles[t], SKY_TILES);
+    for (i = 0; i < 32; i++) {
+        u16 line[64];
+        u16 c;
+        for (c = 0; c < 64; c++) {
+            u16 v = sky_map[t][i * 64 + c];
+            line[c] = TILE_ATTR(TILE_SKY + (v & 0x7FF), 3, 0, (v & 0x800) ? 1 : 0, 0);
+        }
+        vdp_map_row(VRAM_PLANE_B, i, line, 64, 0);
+    }
+    if (screen_on) vdp_display(1);
+}
+
 static void set_theme(u8 t)
 {
     u8 p, i;
@@ -74,6 +99,10 @@ static void set_theme(u8 t)
         cur_pal[3][i] = theme_palettes[t][1][i];
     }
     pal_dirty = 1;
+    if (t != theme_now) {
+        theme_now = t;
+        sky_upload(t);
+    }
 }
 
 /* Manda le quattro tavolozze al VDP, scurite di quanto dice la sfumatura. */
@@ -1192,26 +1221,13 @@ static void update_backdrop_scroll(s16 *bx, s16 *by)
 
 void game_init(void)
 {
-    u16 i;
-
     vdp_init();
     pad_init();
     psg_init();
 
-    set_theme(0);
-    palette_upload();
     vdp_load_tiles(0, gfx_tiles, GFX_TILE_COUNT);
-
-    /* il fondale sta tutto nel piano B e non cambia più */
-    for (i = 0; i < 32; i++) {
-        u16 line[64];
-        u16 c;
-        for (c = 0; c < 64; c++) {
-            u16 v = backdrop_map[i * 64 + c];
-            line[c] = TILE_ATTR(v & 0x7FF, 3, 0, (v & 0x800) ? 1 : 0, 0);
-        }
-        vdp_map_row(VRAM_PLANE_B, i, line, 64, 0);
-    }
+    set_theme(0);                   /* carica anche il cielo di giorno */
+    palette_upload();
     vdp_fill_plane(VRAM_PLANE_A, 0);
     text_clear(VRAM_WINDOW, 0);
 
@@ -1223,6 +1239,7 @@ void game_init(void)
     arena_h = (u16)(arena_rows * CELL);
     set_state(ST_TITLE, 0);
 
+    screen_on = 1;
     vdp_display(1);
     set_sr(0x2000);
 }

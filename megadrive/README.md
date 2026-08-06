@@ -69,17 +69,31 @@ dire niente.
 ### Quattro arie
 
 Ogni quattro cave cambia l'ora del giorno: **giorno** (1-4), **tramonto**
-(5-8), **notte** (9-12), **alba** (la tredicesima). I disegni sono sempre gli
-stessi — non ci starebbero quattro fondali in memoria video — a cambiare sono
-le tavolozze del terreno e del cielo, ricalcolate da `tools/md_assets.py` con
-due formule diverse: scaldare il cielo al tramonto e scurire la terra nello
-stesso colpo, con una formula sola, non si può. Il nano, le scritte e gli
-spiritelli restano i colori di sempre: se cambiassero anche loro non si
-riconoscerebbe più niente, e verrebbe fuori un filtro sulla lente invece che
-un'ora del giorno.
+(5-8), **notte** (9-12), **alba** (la tredicesima). Cambiano due cose insieme.
+
+Le **tavolozze** del terreno e del cielo sono ricalcolate da
+`tools/md_assets.py` con due formule diverse: scaldare il cielo al tramonto e
+scurire la terra nello stesso colpo, con una formula sola, non si può. Il nano,
+le scritte e gli spiritelli restano i colori di sempre: se cambiassero anche
+loro non si riconoscerebbe più niente, e verrebbe fuori un filtro sulla lente
+invece che un'ora del giorno.
+
+Il **cielo** è un disegno diverso per ogni aria, non lo stesso ricolorato: al
+tramonto le nuvole si stirano in strisce lunghe e il sole scende sulle colline,
+di notte al suo posto c'è la falce di luna e il cielo si riempie di stelle,
+all'alba la foschia si posa sulle colline e il sole è pallido e basso. In
+memoria video ce n'è posto per uno solo — sono trecento celle l'uno, e in tutto
+ce ne sono 1472 — quindi si riscrive sempre sullo stesso pezzo quando cambia
+l'aria.
+
+Le stelle hanno un problema loro: bianche come le nuvole, il velo blu della
+notte spegnerebbe anche loro. Si prendono il sesto posto della tavolozza del
+cielo, che non usa nessuno (il fondale mai, il macchinario per due pixel), e
+solo di notte quel colore non segue l'ora e resta acceso.
 
 Il cambio capita mentre lo schermo è già spento fra una cava e l'altra, quindi
-non si vede il passaggio: si riaccende e l'aria è un'altra.
+né la ricolorata né la riscrittura del cielo si vedono: si riaccende e l'aria è
+un'altra.
 
 ## Costruire la ROM
 

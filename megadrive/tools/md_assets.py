@@ -48,7 +48,7 @@ SAMPLES = 12000          # campioni per unità di peso, per il median cut
 # colori: il logo inglese è fatto con gli stessi due colori di quello italiano
 # e il fondale senza sole è il fondale, quindi non hanno niente da chiedere e
 # così le tavolozze restano identiche.
-GUESTS = {1: ["logo_en"], 3: ["backdrop_nosun"], 0: ["movplat_crack"]}
+GUESTS = {1: ["logo_en"], 0: ["movplat_crack"]}
 
 
 def cracked(img):
@@ -144,6 +144,180 @@ def strip_sun(img):
             else:
                 px[x, y] = sky
     return out
+
+
+# --------------------------------------------------------- i quattro cieli
+# Ricolorare la tavolozza cambia l'ora, non il tempo che fa: al tramonto ci
+# vogliono le strisce lunghe basse, di notte le stelle e la luna al posto del
+# sole, all'alba la foschia che sta ferma sopra le colline. Sono quattro
+# disegni veri, non quattro filtri, e in memoria video ce ne sta uno alla
+# volta: si ricambia quando cambia l'aria, a schermo nero fra una cava e
+# l'altra.
+#
+# Il conto dei disegni è la cosa da tenere d'occhio. Le bande orizzontali
+# lunghe tutta l'immagine non costano quasi niente — la riga si ripete uguale e
+# il dedup se ne accorge — mentre ogni stella è una cella nuova per conto suo:
+# per questo sono contate, e non sparse a caso.
+STAR_SEED = 7
+STAR_COUNT = 34
+MOON = (212, 48, 27, 13)                # centro, raggio, sfasamento del morso
+
+# Di notte le stelle devono restare stelle. Bianche come le nuvole non
+# reggono: il velo blu che si passa su tutto il cielo spegne anche loro, e
+# resta un cielo vuoto. Il posto 6 della tavolozza del cielo però non lo usa
+# nessuno — il fondale mai, il macchinario per due pixel — quindi se lo
+# prendono le stelle e la luna, e solo di notte quel colore non segue l'ora e
+# resta acceso. Costa zero: il colore c'era già.
+STAR_INK = (109, 255, 255)
+THEME_FIX = {2: {3: {6: (7, 7, 7)}}}    # aria -> tavolozza -> posto -> colore
+
+
+# Il velo si dà a mano, pixel per pixel. Farlo disegnare a Pillow con un colore
+# trasparente sembra funzionare — a schermo il velo si vede — ma lascia sotto
+# un canale alfa basso, e per il VDP alfa basso vuol dire «cella vuota»: al
+# posto della foschia veniva fuori un buco nel cielo.
+def _mix(px, x, y, rgb, alpha):
+    r, g, b, _a = px[x, y]
+    px[x, y] = (r + (rgb[0] - r) * alpha // 255,
+                g + (rgb[1] - g) * alpha // 255,
+                b + (rgb[2] - b) * alpha // 255, 255)
+
+
+def _band(img, y0, y1, rgb, alpha):
+    """Una fascia larga tutta l'immagine: le righe si ripetono uguali, quindi
+    costa pochissime celle nuove."""
+    px = img.load()
+    for y in range(y0, y1 + 1):
+        for x in range(img.width):
+            _mix(px, x, y, rgb, alpha)
+
+
+def _streak(img, x0, x1, y, h, rgb, alpha):
+    """Una nuvola stirata: un rettangolo con le punte arrotondate."""
+    px = img.load()
+    r = h / 2.0
+    for y2 in range(y, y + h + 1):
+        dy = (y2 - (y + r)) / (r + 0.5)
+        for x in range(x0, x1 + 1):
+            dx = 0.0
+            if x < x0 + r:
+                dx = (x0 + r - x) / (r + 0.5)
+            elif x > x1 - r:
+                dx = (x - (x1 - r)) / (r + 0.5)
+            if dx * dx + dy * dy <= 1.0:
+                _mix(px, x, y2, rgb, alpha)
+
+
+def _disc(img, cx, cy, r, rgb, alpha=255):
+    px = img.load()
+    for y in range(cy - r, cy + r + 1):
+        for x in range(cx - r, cx + r + 1):
+            if (x - cx) ** 2 + (y - cy) ** 2 <= r * r:
+                _mix(px, x, y, rgb, alpha)
+
+
+def _clear_sky(img, cx, cy, r):
+    """Ripulisce un tondo di cielo, riga per riga, del colore che ha lì: serve
+    a fare posto alla luna, che altrimenti finisce dentro una nuvola."""
+    px = img.load()
+    for y in range(cy - r, cy + r + 1):
+        sky = px[1, y]
+        for x in range(cx - r, cx + r + 1):
+            if (x - cx) ** 2 + (y - cy) ** 2 <= r * r:
+                px[x, y] = sky
+
+
+def _stars(img, avoid):
+    """Stelle solo dove il cielo è pulito: sopra una nuvola sparirebbero, e in
+    più costerebbero una cella nuova per niente."""
+    import random
+    rng = random.Random(STAR_SEED)
+    px = img.load()
+    put = 0
+    tries = 0
+    ax, ay, ar = avoid
+    while put < STAR_COUNT and tries < 4000:
+        tries += 1
+        x = rng.randrange(3, 253)
+        y = rng.randrange(3, 168)
+        if (x - ax) ** 2 + (y - ay) ** 2 < (ar + 14) ** 2:
+            continue
+        r, g, b, _a = px[x, y]
+        if r > 180:                     # è una nuvola: lasciala stare
+            continue
+        px[x, y] = STAR_INK + (255,)
+        if put % 3 == 0:                # una su tre è grossa, con la crocetta
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                px[x + dx, y + dy] = STAR_INK + (255,)
+        put += 1
+
+
+def _crescent(img, cx, cy, r, off):
+    """La luna: un disco bianco a cui un secondo disco, spostato di lato,
+    mangia il pezzo. Il morso prende il colore del cielo di quella riga, che
+    lungo la sfumatura non è mai lo stesso."""
+    px = img.load()
+    for y in range(cy - r, cy + r + 1):
+        for x in range(cx - r, cx + r + 1):
+            if (x - cx) ** 2 + (y - cy) ** 2 > r * r:
+                continue
+            if (x - cx - off) ** 2 + (y - cy) ** 2 <= (r - 3) ** 2:
+                continue
+            px[x, y] = STAR_INK + (255,)
+
+
+def sky_variants():
+    """Per ogni aria due immagini: quella senza astro va nella metà sinistra,
+    quella con l'astro nella metà destra ribaltata dal VDP. È lo stesso
+    trucco di prima — il cielo non ha giunte e costa la metà — e serve ancora
+    a non ritrovarsi due soli (o due lune) in cielo."""
+    base = half(load("backdrop"), (256, 256), Image.BOX)
+    plain = strip_sun(base)
+    out = {"sky_giorno": plain, "sky_giorno_f": base}
+
+    # tramonto: il sole è sceso verso le colline e le nuvole si sono stirate.
+    # Le strisce si posano dopo il sole: una che gli passa davanti è
+    # esattamente quello che si vede a quell'ora.
+    s = plain.copy()
+    streaks = ((4, 150, 92, 5), (56, 232, 116, 4), (0, 118, 150, 6),
+               (128, 254, 168, 4), (34, 164, 184, 5))
+    for x0, x1, y, h in streaks:
+        _streak(s, x0, x1, y, h, (255, 255, 255), 235)
+    out["sky_tramonto"] = s
+    f = plain.copy()
+    _disc(f, 217, 150, 33, (255, 255, 182), 90)
+    _disc(f, 217, 150, 28, (255, 255, 182), 255)
+    for x0, x1, y, h in streaks:
+        _streak(f, x0, x1, y, h, (255, 255, 255), 235)
+    out["sky_tramonto_f"] = f
+
+    # notte: niente sole, stelle sopra e la falce di luna dove stava il sole
+    s = plain.copy()
+    _stars(s, (MOON[0], MOON[1], MOON[2]))
+    out["sky_notte"] = s
+    f = s.copy()
+    _clear_sky(f, MOON[0], MOON[1], MOON[2] + 3)
+    _crescent(f, *MOON)
+    out["sky_notte_f"] = f
+
+    # alba: la foschia posata sulle colline, e il sole ancora pallido e basso
+    fog = ((186, 193, 190), (176, 184, 140), (166, 174, 100), (156, 164, 65))
+    s = plain.copy()
+    for y0, y1, a in fog:
+        _band(s, y0, y1, (255, 255, 255), a)
+    out["sky_alba"] = s
+    f = plain.copy()
+    _clear_sky(f, 217, 134, 24)
+    _disc(f, 217, 134, 22, (255, 255, 255), 110)
+    _disc(f, 217, 134, 17, (255, 255, 182), 210)
+    for y0, y1, a in fog:
+        _band(f, y0, y1, (255, 255, 255), a)
+    out["sky_alba_f"] = f
+    return out
+
+
+SKY_NAMES = [f"sky_{name}{suf}" for name, _t, _s in THEMES for suf in ("", "_f")]
+GUESTS[3] = SKY_NAMES
 
 
 def wooden(img):
@@ -330,6 +504,7 @@ def main():
     belongs.update({n: pal for pal, names in GUESTS.items() for n in names})
 
     raw = {}
+    skies = sky_variants()
     for n in belongs:
         if n == "font":
             raw[n] = render_font()
@@ -338,8 +513,8 @@ def main():
             # Media d'area invece di Lanczos: quest'ultimo, sul bordo fra
             # nuvola e cielo, inventa un alone che diventa una frangia.
             raw[n] = half(load(n), (256, 256), Image.BOX)
-        elif n == "backdrop_nosun":
-            raw[n] = strip_sun(half(load("backdrop"), (256, 256), Image.BOX))
+        elif n in skies:
+            raw[n] = skies[n]
         elif n.startswith("logo"):
             raw[n] = half(load(n), (256, 64))
         elif n == "hazard":
@@ -722,23 +897,28 @@ def main():
     idx, w, h = indexed["hazard"]
     hazard = bank.block(idx, w, h, 0, 0, 3, 3, order="col")
 
-    # ---- fondale e logo: mappe di celle con i disegni ripetuti riusati
-    idx, w, h = indexed["backdrop"]
-    sunny = bank.block(idx, w, h, 0, 0, 32, 32, dedup=True)
-    idx, w, h = indexed["backdrop_nosun"]
-    plain = bank.block(idx, w, h, 0, 0, 32, 32, dedup=True)
+    # ---- i quattro cieli: ognuno nel suo banco, perché in memoria video se ne
+    # tiene uno solo alla volta e il posto dev'essere sempre quello.
     # Il piano è largo 64 celle: la metà destra riusa gli stessi disegni
-    # ribaltati, così il cielo non ha giunte e non costa altra memoria. Il sole
+    # ribaltati, così il cielo non ha giunte e non costa altra memoria. L'astro
     # però comparirebbe due volte, uno per lato: sta solo nella metà ribaltata
     # (dove nella schermata del titolo spunta accanto al logo) e la metà di
-    # sinistra usa la copia senza. Le uniche celle nuove sono quelle del sole,
+    # sinistra usa la copia senza. Le uniche celle nuove sono quelle dell'astro,
     # tutte le altre le riconosce il dedup.
-    backdrop_map = []
-    for row in range(32):
-        line = plain[row * 32:(row + 1) * 32]
-        mirror = sunny[row * 32:(row + 1) * 32]
-        backdrop_map.extend(line)
-        backdrop_map.extend(t | 0x0800 for t in reversed(mirror))
+    sky_banks, sky_maps = [], []
+    for tname, _ft, _fs in THEMES:
+        sky = Bank()
+        idx, w, h = indexed[f"sky_{tname}"]
+        plain = sky.block(idx, w, h, 0, 0, 32, 32, dedup=True)
+        idx, w, h = indexed[f"sky_{tname}_f"]
+        astro = sky.block(idx, w, h, 0, 0, 32, 32, dedup=True)
+        m = []
+        for row in range(32):
+            m.extend(plain[row * 32:(row + 1) * 32])
+            m.extend(t | 0x0800 for t in reversed(astro[row * 32:(row + 1) * 32]))
+        sky_banks.append(sky)
+        sky_maps.append(m)
+    sky_room = max(len(b.tiles) for b in sky_banks)
     # Le due lingue portano ognuna il suo logo: sono parole diverse, ma i
     # disegni uguali (il fondo, i pieni) se li spartiscono.
     idx, w, h = indexed["logo"]
@@ -772,13 +952,14 @@ def main():
 
         # le tavolozze delle quattro arie: solo terreno (0) e cielo (3)
         f.write(f"const u16 theme_palettes[{len(THEMES)}][2][16] = {{\n")
-        for name, ft, fs in THEMES:
+        for ti, (name, ft, fs) in enumerate(THEMES):
             f.write(f"    {{  /* {name} */\n")
             for pal, fn in ((0, ft), (3, fs)):
+                fixed = THEME_FIX.get(ti, {}).get(pal, {})
                 cols = [0]
-                for col in palettes[pal]:
+                for slot, col in enumerate(palettes[pal], start=1):
                     r, g, b = (min(7, (v * 8) // 256) for v in col)
-                    r, g, b = fn(r, g, b)
+                    r, g, b = fixed.get(slot) or fn(r, g, b)
                     cols.append((b << 9) | (g << 5) | (r << 1))
                 cols += [0] * (16 - len(cols))
                 f.write("        {" + ", ".join(f"0x{c:04X}" for c in cols) + "},\n")
@@ -797,7 +978,29 @@ def main():
         f.write(carr("decor_cells", [v for c in decor for v in c]) + "\n\n")
         f.write(carr("ground_cells", [v for c in ground for v in c]) + "\n\n")
         f.write(carr("machine_map", machine) + "\n\n")
-        f.write(carr("backdrop_map", backdrop_map, 16) + "\n\n")
+
+        # I cieli: un blocco di disegni per aria, tutti della stessa lunghezza
+        # (quella del più caro) perché in memoria video occupano sempre lo
+        # stesso posto e ci si scrive sopra.
+        f.write(f"const u32 sky_tiles[{len(THEMES)}][{sky_room * 8}] = {{\n")
+        for tname, b in zip([t[0] for t in THEMES], sky_banks):
+            f.write(f"    {{  /* {tname} */\n")
+            for t in b.tiles:
+                words = [int.from_bytes(t[i:i + 4], "big") for i in range(0, 32, 4)]
+                f.write("    " + " ".join(f"0x{v:08X}," for v in words) + "\n")
+            pad = (sky_room - len(b.tiles)) * 8
+            if pad:
+                f.write("    " + " ".join(["0x00000000,"] * pad) + "\n")
+            f.write("    },\n")
+        f.write("};\n\n")
+        f.write(f"const u16 sky_map[{len(THEMES)}][2048] = {{\n")
+        for tname, m in zip([t[0] for t in THEMES], sky_maps):
+            f.write(f"    {{  /* {tname} */\n")
+            for i in range(0, len(m), 16):
+                f.write("    " + " ".join(f"0x{v:04X}," for v in m[i:i + 16]) + "\n")
+            f.write("    },\n")
+        f.write("};\n\n")
+
         f.write(carr("logo_map", logo_map, 16) + "\n\n")
         f.write(carr("logo_map_en", logo_map_en, 16) + "\n\n")
         f.write(carr("icon_cells", [v for c in icons for v in c]) + "\n\n")
@@ -829,7 +1032,10 @@ def main():
         f.write("extern const u16 decor_cells[];     /* 3 celle x 4 */\n")
         f.write("extern const u16 ground_cells[];    /* 2 celle x 4 */\n")
         f.write("extern const u16 machine_map[];     /* 8x8 celle */\n")
-        f.write("extern const u16 backdrop_map[];    /* 64x32 celle */\n")
+        f.write(f"#define SKY_TILES      {sky_room}\n")
+        f.write(f"#define TILE_SKY       {len(bank.tiles)}   /* dove si posa il cielo di turno */\n")
+        f.write(f"extern const u32 sky_tiles[THEME_COUNT][{sky_room * 8}];\n")
+        f.write("extern const u16 sky_map[THEME_COUNT][2048];   /* 64x32 celle */\n")
         f.write("extern const u16 logo_map[];        /* 32x8 celle */\n")
         f.write("extern const u16 logo_map_en[];     /* lo stesso, in inglese */\n")
         f.write("extern const u16 icon_cells[];      /* 4 icone x 4 disegni */\n")
@@ -879,7 +1085,10 @@ def main():
                     px[x, y] = palettes[pal][v - 1]
         prev.save(os.path.join(PREVIEW, name + ".png"))
 
-    print(f"disegni: {len(bank.tiles)} su 1472 disponibili")
+    print(f"disegni: {len(bank.tiles)} + {sky_room} di cielo = "
+          f"{len(bank.tiles) + sky_room} su 1472 disponibili")
+    for (tname, _a, _b), b in zip(THEMES, sky_banks):
+        print(f"  cielo {tname}: {len(b.tiles)} disegni")
     for p in range(4):
         print(f"  tavolozza {p}: {len(palettes[p])} colori  ({[n for n, _ in GROUPS[p]]})")
 
