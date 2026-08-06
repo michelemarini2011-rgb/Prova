@@ -48,7 +48,18 @@ SAMPLES = 12000          # campioni per unità di peso, per il median cut
 # colori: il logo inglese è fatto con gli stessi due colori di quello italiano
 # e il fondale senza sole è il fondale, quindi non hanno niente da chiedere e
 # così le tavolozze restano identiche.
-GUESTS = {1: ["logo_en"], 3: ["backdrop_nosun"]}
+GUESTS = {1: ["logo_en"], 3: ["backdrop_nosun"], 0: ["movplat_crack"]}
+
+
+def cracked(img):
+    """L'asse con le crepe: la stessa tavola, spaccata in tre punti. Serve a
+    dire «questa cede» prima che ceda, senza inventare un altro legno."""
+    out = img.copy()
+    d = ImageDraw.Draw(out)
+    dark = (72, 36, 0, 255)
+    for x0 in (5, 13, 21, 29, 37, 45):
+        d.line([(x0, 0), (x0 + 2, 3), (x0 - 1, 7)], fill=dark)
+    return out
 
 FONT_CHARS = ([chr(c) for c in range(32, 127)] +
               ["à", "è", "é", "ì", "ò", "ù"])
@@ -315,6 +326,8 @@ def main():
             raw[n] = half(load(n), (24, 24))
         elif n == "movplat":
             raw[n] = wooden(half(load(n)))
+        elif n == "movplat_crack":
+            raw[n] = cracked(wooden(half(load("movplat"))))
         elif n == "icons":
             # le icone stanno nel pannello: fondo nero pieno, o si vedrebbe
             # il cielo del piano di sfondo attraverso le parti trasparenti
@@ -417,6 +430,51 @@ def main():
     arrow_right = paint(arrow)                  # sinistra: la stessa, ribaltata
     arrow_up = paint(rot_ccw(arrow))            # giù: la stessa, capovolta
 
+    # L'elmo dello spiritello corazzato: uno sprite da 24x8 che gli si posa
+    # in testa. Il disegno dello spiritello resta quello di sempre.
+    def from_chars(rows, mapping, pal):
+        cell = [[0] * len(rows[0]) for _ in rows]
+        for y, r in enumerate(rows):
+            for x, ch in enumerate(r):
+                if ch in mapping:
+                    cell[y][x] = nearest(pal, mapping[ch])
+        return cell
+
+    STEEL = {"m": (36, 36, 72), "M": (218, 218, 218), "h": (255, 255, 255)}
+    helmet = paint(from_chars([
+        "....mmmmmmmm....",
+        "..mmMMMMMMMMmm..",
+        ".mMMhhMMMMMMMMm.",
+        ".mMMMMMMMMMMMMm.",
+        "mmmmmmmmmmmmmmmm",
+        "mMMMMMMMMMMMMMMm",
+        "mmmmmmmmmmmmmmmm",
+        "................",
+    ], STEEL, 2))
+
+    # Il nastro trasportatore: quattro fotogrammi della stessa cella da 16x16.
+    # In memoria video ne sta uno solo — gli altri tre arrivano in DMA sopra
+    # allo stesso posto, così la tavola dei nomi non si tocca mai.
+    belt_frames = []
+    for frame in range(4):
+        cell = [[0] * 16 for _ in range(16)]
+        edge = nearest(0, (72, 36, 0))
+        body = nearest(0, (182, 145, 72))
+        stud = nearest(0, (255, 218, 145))
+        for y in range(16):
+            for x in range(16):
+                if y < 2 or y > 13:
+                    cell[y][x] = edge
+                else:
+                    cell[y][x] = body
+        for y in (4, 5, 10, 11):                # le tacche che scorrono
+            for k in range(4):
+                x = (k * 4 + frame * 1 + (0 if y < 8 else 2)) & 15
+                cell[y][x] = stud
+                cell[y][(x + 1) & 15] = stud
+        belt_frames.append(cell)
+    belt_base = paint(belt_frames[0])
+
     # La palla di fuoco che gira attorno al perno: due fotogrammi che pulsano,
     # a fasce concentriche. Un pallino da otto pixel non bastava — è un
     # ostacolo che costa un cuore e si deve vedere da lontano.
@@ -502,6 +560,21 @@ def main():
                 if base is None:
                     base = i
         strips[cells] = base
+
+    # le stesse strisce, crepate: l'asse che sta per cedere
+    idx, w, h = indexed["movplat_crack"]
+    def cplank(cell):
+        return [bank.cut(idx, w, h, cell * 2, 0), bank.cut(idx, w, h, cell * 2 + 1, 0)]
+    cleft, cmid, cright = cplank(0), cplank(1), cplank(2)
+    cracks = {}
+    for cells in (4, 5):
+        base = None
+        for p in [cleft] + [cmid] * (cells - 2) + [cright]:
+            for t in p:
+                i = bank.add(t)
+                if base is None:
+                    base = i
+        cracks[cells] = base
 
     # ---- nano: fotogrammi 32x32 in ordine sprite
     idx, w, h = indexed["dwarf"]
@@ -601,6 +674,20 @@ def main():
         f.write(carr("logo_map_en", logo_map_en, 16) + "\n\n")
         f.write(carr("icon_cells", [v for c in icons for v in c]) + "\n\n")
 
+        # i quattro fotogrammi del nastro, come dati grezzi da mandare in DMA
+        f.write("const u32 belt_anim[4][32] = {\n")
+        for cell in belt_frames:
+            words = []
+            for tx in range(2):            # ordine sprite, come paint()
+                for ty in range(2):
+                    for y in range(8):
+                        v = 0
+                        for x in range(8):
+                            v = (v << 4) | cell[ty * 8 + y][tx * 8 + x]
+                        words.append(v)
+            f.write("    {" + ", ".join(f"0x{v:08X}" for v in words) + "},\n")
+        f.write("};\n\n")
+
     with open(os.path.join(RES, "gfx.h"), "w") as f:
         f.write("/* Generato da tools/md_assets.py — non modificare a mano. */\n")
         f.write("#ifndef GFX_H\n#define GFX_H\n#include \"md.h\"\n\n")
@@ -615,7 +702,8 @@ def main():
         f.write("extern const u16 backdrop_map[];    /* 64x32 celle */\n")
         f.write("extern const u16 logo_map[];        /* 32x8 celle */\n")
         f.write("extern const u16 logo_map_en[];     /* lo stesso, in inglese */\n")
-        f.write("extern const u16 icon_cells[];      /* 4 icone x 4 disegni */\n\n")
+        f.write("extern const u16 icon_cells[];      /* 4 icone x 4 disegni */\n")
+        f.write("extern const u32 belt_anim[4][32];  /* i fotogrammi del nastro */\n\n")
         f.write(f"#define TILE_FONT      {font_base}\n")
         f.write(f"#define FONT_CHARS     {len(FONT_CHARS)}\n")
         f.write(f"#define TILE_EMPTY     {empty}\n")
@@ -626,6 +714,10 @@ def main():
         f.write(f"#define TILE_ARROW_U   {arrow_up}   /* 2x2, punta in alto */\n")
         f.write(f"#define TILE_BAR       {bar_base}   /* 9 livelli, da vuoto a pieno */\n")
         f.write(f"#define TILE_FIRE      {fire_base}   /* 2x2, due fotogrammi */\n")
+        f.write(f"#define TILE_HELMET    {helmet}   /* 3x1, sopra lo spiritello */\n")
+        f.write(f"#define TILE_BELT      {belt_base}   /* 2x2, si anima in DMA */\n")
+        f.write(f"#define TILE_CRACK4    {cracks[4]}\n")
+        f.write(f"#define TILE_CRACK5    {cracks[5]}\n")
         f.write(f"#define TILE_CRATE     {crate[0]}\n")
         f.write(f"#define TILE_PLANK4    {strips[4]}\n")
         f.write(f"#define TILE_PLANK5    {strips[5]}\n")

@@ -3,7 +3,7 @@
 #define LEVELS_H
 #include "md.h"
 
-#define ARENA_COUNT 7
+#define ARENA_COUNT 10
 #define ARENA_COLS  30
 
 /* Codici delle celle. */
@@ -24,6 +24,10 @@
 #define CELL_BLINK_B  14
 #define CELL_SWIFT    15
 #define CELL_ORBIT    16
+#define CELL_CRUMBLE  17
+#define CELL_BELT_R   18
+#define CELL_BELT_L   19
+#define CELL_ARMOR    20
 
 typedef struct {
     const char *name;

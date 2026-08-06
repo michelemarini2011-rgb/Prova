@@ -118,6 +118,8 @@ static void dwarf_move_y(fix dy)
     /* niente terreno: resta l'asse mobile, su cui si sale dall'alto */
     p = land_on(dwarf.x, dwarf.y, DW_W, DW_H, dwarf.vy, prev_bottom, dwarf.drop_timer);
     if (p) {
+        /* il peso del nano è quello che fa partire il conto alla rovescia */
+        if (p->kind == PLAT_CRUMBLE && p->phase == 0) p->phase = 1;
         dwarf.y = FIX(p->y - DW_H);
         dwarf.vy = 0;
         dwarf.on_ground = 1;
@@ -216,7 +218,11 @@ void dwarf_update(void)
     was_on_ground = dwarf.on_ground;
     dwarf_move_x(dwarf.vx);
     dwarf_move_y(dwarf.vy);
-    if (dwarf.on_ground) dwarf.coyote = DW_COYOTE;
+    if (dwarf.on_ground) {
+        fix push = belt_at((s16)(TOI(dwarf.x) + DW_W / 2), (s16)(TOI(dwarf.y) + DW_H + 2));
+        if (push) dwarf_move_x(push);
+        dwarf.coyote = DW_COYOTE;
+    }
     if (dwarf.on_ground && !was_on_ground) game_on_land();
 
     {
@@ -236,6 +242,7 @@ void imp_reset(Imp *im)
     im->vy = 0;
     im->state = IMP_ROAM;
     im->stun = 0;
+    im->armor = (u8)(im->kind == IMP_K_ARMOR);
     im->anim = (u8)(rnd() & 3);
     im->bob = rnd();
     im->phase = (u8)rnd();
@@ -363,9 +370,13 @@ void imp_update(Imp *im, u8 think)
         if (im->vy > VEL(700)) im->vy = VEL(700);
         imp_move(im);
         if (im->grounded) {
+            fix push;
             if (im->vx > IMP_FRICTION) im->vx -= IMP_FRICTION;
             else if (im->vx < -IMP_FRICTION) im->vx += IMP_FRICTION;
             else im->vx = 0;
+            /* addormentato su un nastro se ne va da solo verso il macchinario */
+            push = belt_at(TOI(im->x), (s16)(TOI(im->y) + IMP_R + 2));
+            if (push) im->vx = push;
         }
         if (im->stun == 0) {
             im->state = IMP_ROAM;
@@ -523,9 +534,12 @@ void block_update(Block *b)
     b->vy += BLK_GRAVITY;
     if (b->vy > VEL(700)) b->vy = VEL(700);
     if (b->on_ground) {
+        fix push;
         if (b->vx > BLK_FRICTION) b->vx -= BLK_FRICTION;
         else if (b->vx < -BLK_FRICTION) b->vx += BLK_FRICTION;
         else b->vx = 0;
+        push = belt_at((s16)(TOI(b->x) + BLK_SIZE / 2), (s16)(TOI(b->y) + BLK_SIZE + 2));
+        if (push) b->vx = push;
     }
     block_move_x(b, b->vx);
     block_move_y(b, b->vy);
@@ -573,12 +587,38 @@ static void plat_update_blink(Plat *p)
     p->on = (u8)(p->phase < BLINK_ON);
 }
 
+/* L'asse che si sbriciola: regge un po' dopo che ci sei salito, poi molla e
+   cade, e dopo un paio di secondi torna al suo posto. */
+static void plat_update_crumble(Plat *p)
+{
+    p->dx = p->dy = 0;
+    if (p->phase == 0) return;                  /* nessuno l'ha ancora toccata */
+    p->phase++;
+    if (p->phase == CRUMBLE_HOLD) {             /* molla */
+        p->on = 0;
+        p->vy = 0;
+    }
+    if (!p->on) {
+        p->vy += BLK_GRAVITY;
+        p->fy += p->vy;
+        p->y = TOI(p->fy);
+        if (p->phase >= CRUMBLE_HOLD + CRUMBLE_BACK) {
+            p->phase = 0;
+            p->on = 1;
+            p->vy = 0;
+            p->y = p->y0;
+            p->fy = FIX(p->y0);
+        }
+    }
+}
+
 void plat_update(Plat *p)
 {
     fix before = p->x;
     s16 dir = (p->vx > 0) ? 1 : -1;
 
     if (p->kind == PLAT_LIFT) { plat_update_lift(p); return; }
+    if (p->kind == PLAT_CRUMBLE) { plat_update_crumble(p); return; }
     if (p->kind == PLAT_BLINK) { plat_update_blink(p); return; }
     fix nx = p->x + p->vx;
     fix stop = 0;

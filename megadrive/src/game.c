@@ -189,6 +189,14 @@ void game_on_hammer(fix px, fix py)
         u32 k2;
         u16 k;
         if (im->state == IMP_BOXED || im->state == IMP_CARRIED) continue;
+        if (im->armor) {                        /* l'onda d'urto ci rimbalza */
+            s16 adx = TOI(im->x) - ix, ady = TOI(im->y) - iy;
+            if (adx * adx + ady * ady < (s16)(SHOCK_RX * SHOCK_RX)) {
+                particles_burst(im->x, im->y, 1, 2, VEL(120));
+                sfx_play(SFX_FREE);
+            }
+            continue;
+        }
         dx = TOI(im->x) - ix;
         dy = TOI(im->y) - iy;
         kx = ((s32)dx << 8) / SHOCK_RX;
@@ -239,6 +247,33 @@ static void check_carry(void)
         sfx_play(SFX_GRAB);
         break;
     }
+}
+
+/* L'elmo non si toglie a martellate: bisogna saltarci sopra. È l'unico
+   spiritello che si può toccare senza rimetterci un cuore, e solo dall'alto. */
+static u8 check_stomp(void)
+{
+    u8 i;
+    if (dwarf.vy <= 0) return 0;
+    for (i = 0; i < imp_count; i++) {
+        Imp *im = &imps[i];
+        s16 dx, top, feet;
+        if (!im->armor || im->state != IMP_ROAM) continue;
+        dx = TOI(dwarf.x) + DW_W / 2 - TOI(im->x);
+        if (dx < 0) dx = -dx;
+        if (dx > IMP_R + DW_W / 2) continue;
+        top = TOI(im->y) - IMP_R;
+        feet = TOI(dwarf.y) + DW_H;
+        if (feet < top - 8 || feet > top + 14) continue;
+        im->armor = 0;
+        im->vy = VEL(120);                      /* lo schiaccia un po' giù */
+        dwarf.vy = -VEL(430);                   /* e il nano rimbalza */
+        dwarf.jumping = 0;
+        particles_burst(im->x, FIX(top), 1, 6, VEL(190));
+        sfx_play(SFX_FREE);
+        return 1;
+    }
+    return 0;
 }
 
 static void check_contact(void)
@@ -314,22 +349,43 @@ static void check_spikes(void)
     }
 }
 
-static void check_machine(void)
+static void box_imp(Imp *im)
 {
-    Imp *im;
-    s16 dx, dy;
-    if (dwarf.carrying < 0 || !has_machine) return;
-    im = &imps[dwarf.carrying];
-    dx = TOI(dwarf.x) + DW_W / 2 - intake_x;
-    dy = TOI(dwarf.y) + DW_H / 2 - intake_y;
-    if (dx * dx + dy * dy > 21 * 21) return;
     im->state = IMP_BOXED;
-    dwarf.carrying = -1;
     game.boxed++;
     if (machine_crates < 9) machine_crates++;
     hud_dirty = 1;
     sfx_play(SFX_BOX);
     particles_burst(FIX(intake_x), FIX(intake_y), 1, 6, VEL(170));
+}
+
+static void check_machine(void)
+{
+    u8 i;
+    s16 dx, dy;
+    if (!has_machine) return;
+
+    if (dwarf.carrying >= 0) {
+        dx = TOI(dwarf.x) + DW_W / 2 - intake_x;
+        dy = TOI(dwarf.y) + DW_H / 2 - intake_y;
+        if (dx * dx + dy * dy <= 21 * 21) {
+            box_imp(&imps[dwarf.carrying]);
+            dwarf.carrying = -1;
+        }
+    }
+
+    /* Uno spiritello addormentato che arriva da solo alla bocca vale come una
+       consegna: è il nastro che fa il lavoro del nano, ed è tutto il senso di
+       averlo messo. La soglia è più larga perché il muro del macchinario non
+       lo lascia avvicinare oltre. */
+    for (i = 0; i < imp_count; i++) {
+        Imp *im = &imps[i];
+        if (im->state != IMP_STUNNED) continue;
+        dx = TOI(im->x) - intake_x;
+        dy = TOI(im->y) - intake_y;
+        if (dx * dx + dy * dy > 26 * 26) continue;
+        box_imp(im);
+    }
 }
 
 static void update_camera(u8 snap)
@@ -376,7 +432,8 @@ static void update_play(void)
     if (game.state != ST_PLAY) return;
     check_orbits();
     if (game.state != ST_PLAY) return;
-    check_contact();
+    /* la pestata sull'elmo vale per questo quadro: niente contatto */
+    if (!check_stomp()) check_contact();
     if (game.state != ST_PLAY) return;
     check_machine();
     update_camera(0);
@@ -657,6 +714,12 @@ static void draw_imps(void)
         }
         frame = (u16)((im->anim >> 8) & 3);
         tile = TILE_IMP + (row * 4 + frame) * IMP_FRAME_TILES;
+        /* l'elmo va prima: nella lista degli sprite chi viene prima sta
+           davanti, e deve stare sulla testa, non dietro */
+        if (im->armor)
+            sprite_add(TOI(im->x) - 8 - game.cam_x,
+                       TOI(im->y) - 10 - game.cam_y + HUD_H,
+                       2, 1, TILE_ATTR(TILE_HELMET, 2, 0, 0, 0));
         sprite_add(TOI(im->x) - 12 - game.cam_x,
                    TOI(im->y) - 12 - game.cam_y + HUD_H,
                    3, 3, TILE_ATTR(tile, 2, 0, 0, 0));
@@ -705,13 +768,22 @@ static void draw_plats(void)
     for (i = 0; i < plat_count; i++) {
         const Plat *p = &plats[i];
         u16 base = (p->cells >= 5) ? TILE_PLANK5 : TILE_PLANK4;
-        if (!p->on) continue;
+        s16 shake = 0;
+        if (p->kind == PLAT_CRUMBLE) {
+            /* crepata da quando ci hai messo il piede, e sul finire trema */
+            if (p->phase) {
+                base = (p->cells >= 5) ? TILE_CRACK5 : TILE_CRACK4;
+                if (p->phase > CRUMBLE_HOLD / 2) shake = (game.time & 2) ? 1 : -1;
+            }
+            /* caduta: si vede finire di sotto, poi sparisce e torna */
+            if (!p->on && p->phase > CRUMBLE_HOLD + 45) continue;
+        } else if (!p->on) continue;
         /* negli ultimi quaranta quadri lampeggia: il preavviso è la metà del
            gioco, senza sarebbe solo un tranello */
         if (p->kind == PLAT_BLINK && p->phase > BLINK_ON - BLINK_WARN &&
             (p->phase & 4)) continue;
         u8 tiles = (u8)(p->cells * 2), done = 0;
-        s16 sx = TOI(p->x) - game.cam_x;
+        s16 sx = TOI(p->x) - game.cam_x + shake;
         s16 sy = p->y - game.cam_y + HUD_H;
         while (done < tiles) {
             u8 n = (u8)((tiles - done > 4) ? 4 : tiles - done);
@@ -938,6 +1010,17 @@ static void overlay_message(const char *line1, const char *line2)
     }
 }
 
+/* Il nastro si anima senza toccare la mappa: i quattro disegni della cella
+   stanno in memoria di lavoro e a turno finiscono nello stesso posto in
+   memoria video. Ridipingere le celle costerebbe cento volte tanto. */
+static void belt_animate(void)
+{
+    static u8 frame;
+    if (game.time & 7) return;
+    frame = (u8)((frame + 1) & 3);
+    vdp_dma(belt_anim[frame], (u16)(VRAM_TILES + TILE_BELT * 32), 64);
+}
+
 /* Il fondale scorre più piano della cava: la profondità a costo zero. */
 static void update_backdrop_scroll(s16 *bx, s16 *by)
 {
@@ -1087,7 +1170,10 @@ void game_frame(void)
     /* Tutto quello che tocca la memoria video sta dentro il ritorno di quadro:
        fuori, il VDP fa aspettare il processore e si vedrebbero le cuciture. */
     vdp_wait_vblank();
-    if (game.state == ST_PLAY) arena_paint(game.cam_y, 0);
+    if (game.state == ST_PLAY) {
+        arena_paint(game.cam_y, 0);
+        belt_animate();
+    }
     vdp_scroll(ax, ay, bx, by);
     sprite_flush();
     fade_step();

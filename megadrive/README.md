@@ -3,8 +3,9 @@
 Conversione del gioco HTML5 *Martello & Scatole* in una cartuccia per Sega Mega
 Drive / Genesis: stessi movimenti, stessa regia, scritta in C e assembly 68000
 e compilata in una ROM da 512 KB. Le quattro cave dell'originale ci sono tutte,
-più tre nuove che introducono una cosa per volta — gli ascensori, le assi a
-tempo, le scintille — infilate fra quelle vecchie in ordine di difficoltà.
+più sei nuove che introducono una cosa per volta — ascensori, assi a tempo,
+assi marce, nastro trasportatore, scintille, elmi — infilate fra quelle vecchie
+in ordine di difficoltà.
 
 ## Giocare
 
@@ -32,9 +33,16 @@ macchinario e inscatolarli tutti; poi si attraversa il portale che si apre.
 Tre cuori, le punte dei blocchi irti uccidono al primo tocco.
 
 Nelle cave nuove: le **assi verdi** salgono e scendono da sole, le **gialle**
-ci sono e non ci sono (e lampeggiano prima di sparire), le **palle di fuoco**
-girano attorno a un perno e costano un cuore, e gli **spiritelli con la scia**
-corrono una volta e mezzo e si svegliano prima.
+ci sono e non ci sono (e lampeggiano prima di sparire), le **crepate** cedono
+mezzo secondo dopo che ci sali, il **nastro** spinge di lato tutto quello che
+ci sta sopra, le **palle di fuoco** girano attorno a un perno e costano un
+cuore. Fra gli spiritelli, quelli **con la scia** corrono una volta e mezzo e
+si svegliano prima, e quelli **con l'elmo** rimandano indietro le martellate:
+l'unico modo è saltargli in testa.
+
+Due mosse che conviene sapere: uno spiritello addormentato lasciato su un
+nastro **arriva al macchinario da solo**, e lo spiritello con l'elmo è l'unico
+che si può toccare senza rimetterci un cuore — ma solo dall'alto.
 
 Due cose da guardare mentre si gioca: la **barra sopra la testa** dello
 spiritello stordito dice quanto manca prima che si svegli (se lo si sta
@@ -88,7 +96,7 @@ src/entities.c    nano, spiritelli, blocchi irti, assi mobili
 src/game.c        stati, onda d'urto, macchinario, portale, pannello, sprite
 src/fault.c       schermata di errore se il processore inciampa
 res/gfx.*         disegni e tavolozze (generati)
-res/levels.*      le sette cave (generate)
+res/levels.*      le dieci cave (generate)
 tools/md_assets.py   converte i PNG dell'originale nel formato del VDP
 tools/md_levels.py   converte le mappe delle cave
 tools/make_logo_en.py disegna il logo della versione inglese
@@ -140,8 +148,8 @@ ritorno di quadro.
 
 ### Cave e cose nuove
 
-Le tre cave nuove non aggiungono disegni (solo la palla di fuoco, che sono otto
-celle): tutto il resto è codice e mappe.
+Le sei cave nuove costano in tutto una cinquantina di celle di disegni: quasi
+tutto è codice e mappe.
 
 - **l'ascensore** è l'asse mobile con la velocità sulla y invece che sulla x.
   La corsa è fissa, tre celle sopra e tre sotto il punto dove sta nella mappa:
@@ -161,6 +169,22 @@ celle): tutto il resto è codice e mappe.
   niente ragionamento, niente collisioni col terreno. Il disegno è generato a
   fasce concentriche da `tools/md_assets.py`: un pallino da otto pixel non si
   vedeva abbastanza per una cosa che costa un cuore.
+
+- **l'asse che si sbriciola** è un contatore che parte quando il nano ci mette
+  il piede: trentaquattro quadri crepata e tremante, poi molla e cade, e dopo
+  due secondi e mezzo torna al suo posto. Le crepe sono le stesse tavole con
+  sei spaccature disegnate sopra da `tools/md_assets.py`;
+- **il nastro** è una cella solida che spinge di lato chi ci sta sopra: il
+  nano, i blocchi irti e soprattutto gli spiritelli addormentati, che così si
+  consegnano al macchinario da soli — la bocca accetta anche chi arriva senza
+  essere portato. Si anima **senza toccare la mappa**: i quattro fotogrammi
+  della cella stanno in memoria di lavoro e a turno finiscono con un DMA nello
+  stesso posto in memoria video. Ridipingere le celle costerebbe cento volte
+  tanto, e il nastro che va a sinistra è lo stesso disegno ribaltato dal VDP;
+- **lo spiritello con l'elmo** manda a vuoto l'onda d'urto e va pestato in
+  testa: è l'unico che si può toccare impunemente, ma solo cadendogli addosso.
+  L'elmo è uno sprite da 16x8 che sta *prima* di lui nella lista, o gli
+  finirebbe dietro la testa invece che sopra.
 
 Le mappe stanno in `tools/arenas.json` e si guardano con
 `tools/preview_levels.py`, che le disegna tutte in fila e controlla quello che

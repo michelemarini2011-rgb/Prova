@@ -28,10 +28,14 @@ INK = {
     "|": (140, 230, 190),       # ascensore
     "i": (240, 240, 130),       # asse a intermittenza (accesa)
     "j": (150, 150, 70),        # asse a intermittenza (spenta)
+    "c": (190, 120, 60),        # asse che si sbriciola
+    "n": (120, 90, 50),         # nastro verso destra
+    "N": (95, 70, 40),          # nastro verso sinistra
     "x": (60, 60, 90),          # blocco irto
     "o": (255, 150, 40),        # perno della scintilla
     "S": (230, 90, 230),        # spiritello
     "V": (255, 60, 160),        # spiritello svelto
+    "A": (170, 200, 230),       # spiritello con l'elmo
     "P": (255, 255, 255),       # partenza
     "O": (120, 255, 120),       # portale
     "M": (200, 200, 200),       # macchinario
@@ -40,8 +44,9 @@ INK = {
     "f": (240, 120, 160),       # fiore
 }
 
-LIMITS = [("S", 8, "spiritelli"), ("V", 8, "spiritelli"),
-          ("x", 6, "blocchi"), ("o", 6, "scintille")]
+IMPS = "SVA"                    # tutte le razze contano sullo stesso tetto
+LIMITS = [("x", 6, "blocchi"), ("o", 6, "scintille")]
+PLATS = "~|ijc"                 # tutti i tipi di asse mobile
 
 
 def check(a, index):
@@ -57,17 +62,15 @@ def check(a, index):
     for sym, name in (("P", "partenze"), ("O", "portali"), ("M", "macchinari")):
         if joined.count(sym) != 1:
             bad.append(f"{joined.count(sym)} {name} invece di uno")
-    if joined.count("S") + joined.count("V") > 8:
+    if sum(joined.count(c) for c in IMPS) > 8:
         bad.append("più di otto spiritelli")
     for sym, cap, name in LIMITS:
-        if sym in ("S", "V"):
-            continue
         if joined.count(sym) > cap:
             bad.append(f"più di {cap} {name}")
 
     # le assi mobili: ogni fila di simboli uguali è una sola asse
     plats = 0
-    for kind in "~|ij":
+    for kind in PLATS:
         for r, row in enumerate(rows):
             for c in range(COLS):
                 if row[c] == kind and (c == 0 or row[c - 1] != kind):
@@ -124,9 +127,9 @@ def main():
     for i, a in enumerate(arenas):
         j = "".join(a["rows"])
         print(f"  {i + 1}. {a['name']:24s} {len(a['rows']):2d} righe, "
-              f"spiritelli {j.count('S') + j.count('V')} "
-              f"(svelti {j.count('V')}), blocchi {j.count('x')}, "
-              f"scintille {j.count('o')}")
+              f"spiritelli {sum(j.count(c) for c in IMPS)} "
+              f"(svelti {j.count('V')}, elmi {j.count('A')}), "
+              f"blocchi {j.count('x')}, scintille {j.count('o')}")
     return 0 if ok else 1
 
 

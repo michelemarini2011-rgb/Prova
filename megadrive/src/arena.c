@@ -57,6 +57,17 @@ static void paint_row(s16 row)
                            (arena_solid(cx - 1, row) ? 8 : 0));
             u8 variant = (u8)((cx * 5 + row * 11) & 1);
             cell = &terrain_cells[(variant * 16 + mask) * 4];
+        } else if (c == CELL_BELT_R || c == CELL_BELT_L) {
+            /* il nastro che va a sinistra è lo stesso disegno ribaltato: il
+               VDP lo fa da solo, e le tacche scorrono dall'altra parte */
+            static const u16 belt[4] = { TILE_BELT, TILE_BELT + 2,
+                                         TILE_BELT + 1, TILE_BELT + 3 };
+            u8 hf = (u8)(c == CELL_BELT_L);
+            top[cx * 2]        = TILE_ATTR(belt[hf ? 1 : 0], 0, 0, hf, 0);
+            top[cx * 2 + 1]    = TILE_ATTR(belt[hf ? 0 : 1], 0, 0, hf, 0);
+            bottom[cx * 2]     = TILE_ATTR(belt[hf ? 3 : 2], 0, 0, hf, 0);
+            bottom[cx * 2 + 1] = TILE_ATTR(belt[hf ? 2 : 3], 0, 0, hf, 0);
+            continue;
         } else if (c == CELL_ONEWAY) {
             cell = oneway_cell;
         } else if (c >= CELL_DECOR_B && c <= CELL_DECOR_F) {
@@ -149,11 +160,13 @@ void arena_load(u8 index)
                 break;
             case CELL_SPAWN:
             case CELL_SWIFT:
+            case CELL_ARMOR:
                 if (imp_count < MAX_IMPS) {
                     Imp *im = &imps[imp_count++];
                     im->home_x = cxpix;
                     im->home_y = FIX(cy * CELL + CELL / 2);
-                    im->kind = (c == CELL_SWIFT) ? IMP_K_SWIFT : IMP_K_PLAIN;
+                    im->kind = (c == CELL_SWIFT) ? IMP_K_SWIFT :
+                               (c == CELL_ARMOR) ? IMP_K_ARMOR : IMP_K_PLAIN;
                 }
                 break;
             case CELL_ORBIT:
@@ -178,6 +191,7 @@ void arena_load(u8 index)
             case CELL_LIFT:
             case CELL_BLINK_A:
             case CELL_BLINK_B:
+            case CELL_CRUMBLE:
                 /* le celle di fila fanno una sola asse: si conta da sinistra */
                 if (arena_cell(cx - 1, cy) != c && plat_count < MAX_PLATS) {
                     Plat *p = &plats[plat_count++];
@@ -209,6 +223,8 @@ void arena_load(u8 index)
                             p->vy = (mover_index & 1) ? -v : v;
                         }
                         mover_index++;
+                    } else if (c == CELL_CRUMBLE) {
+                        p->kind = PLAT_CRUMBLE;
                     } else {
                         p->kind = PLAT_BLINK;
                         /* le due lettere sono i due tempi: mentre una c'è,

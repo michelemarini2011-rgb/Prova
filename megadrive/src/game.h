@@ -98,7 +98,7 @@ enum { IMP_ROAM, IMP_STUNNED, IMP_CARRIED, IMP_BOXED };
 /* Le razze di spiritello. Lo svelto ha lo stesso disegno: corre una volta e
    mezzo, si sveglia prima e si porta dietro una scia di scintille, che è il
    modo di distinguerlo senza spendere un disegno. */
-enum { IMP_K_PLAIN, IMP_K_SWIFT };
+enum { IMP_K_PLAIN, IMP_K_SWIFT, IMP_K_ARMOR };
 
 typedef struct {
     fix x, y, vx, vy;                   /* centro dello spiritello */
@@ -106,6 +106,7 @@ typedef struct {
     u16 stun;
     u8  state;
     u8  kind;
+    u8  armor;                          /* l'elmo: il martello ci rimbalza */
     u16 anim;
     u16 bob;                            /* fase, 8.8 di giro */
     u8  phase;
@@ -133,7 +134,12 @@ typedef struct {
 
 /* Tre tipi, stesso disegno: quella che va avanti e indietro, quella che sale
    e scende, e quella che c'è e non c'è. */
-enum { PLAT_SLIDE, PLAT_LIFT, PLAT_BLINK };
+enum { PLAT_SLIDE, PLAT_LIFT, PLAT_BLINK, PLAT_CRUMBLE };
+
+/* L'asse che si sbriciola: quanto regge da quando ci sali, e quanto ci mette a
+   tornare. Mezzo secondo scarso è il tempo di accorgersene e saltare via. */
+#define CRUMBLE_HOLD 34
+#define CRUMBLE_BACK 150
 
 /* L'ascensore fa una corsa sua, tre celle sopra e tre sotto il punto dove sta
    nella mappa: legarlo al soffitto voleva dire costruirgli un pozzo attorno,
@@ -156,6 +162,12 @@ typedef struct {
     u16 phase;                          /* per l'intermittenza */
     u8  on;
 } Plat;
+
+/* ------------------------------------------------------- nastro che scorre */
+/* Una cella solida che spinge di lato chi ci sta sopra: il nano, i blocchi e
+   soprattutto gli spiritelli storditi, che così arrivano al macchinario da
+   soli. */
+#define BELT_PUSH VEL(95)
 
 /* ------------------------------------------------------ scintille in giro */
 /* Una scintilla che gira attorno a un perno: nessun disegno nuovo (è quella
@@ -237,7 +249,17 @@ static inline u8 arena_cell(s16 cx, s16 cy)
 static inline u8 arena_solid(s16 cx, s16 cy)
 {
     u8 c = arena_cell(cx, cy);
-    return (u8)(c == CELL_SOLID || c == CELL_MACHINE);
+    return (u8)(c == CELL_SOLID || c == CELL_MACHINE ||
+                c == CELL_BELT_R || c == CELL_BELT_L);
+}
+
+/* Il nastro sotto un punto: quanto spinge, e da che parte. */
+static inline fix belt_at(s16 px, s16 py)
+{
+    u8 c = arena_cell(px >> CELL_BITS, py >> CELL_BITS);
+    if (c == CELL_BELT_R) return BELT_PUSH;
+    if (c == CELL_BELT_L) return -BELT_PUSH;
+    return 0;
 }
 
 static inline u8 arena_oneway(s16 cx, s16 cy)
