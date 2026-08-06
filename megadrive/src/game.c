@@ -271,6 +271,30 @@ static void check_contact(void)
     }
 }
 
+/* Le scintille in giro non uccidono come le punte: costano un cuore, come uno
+   spiritello addosso. Sono ostacoli di percorso, non trappole mortali. */
+static void check_orbits(void)
+{
+    u8 i;
+    if (dwarf.invuln) return;
+    for (i = 0; i < orbit_count; i++) {
+        s16 sx, sy, dx, dy;
+        orbit_pos(&orbits[i], &sx, &sy);
+        dx = TOI(dwarf.x) + DW_W / 2 - sx;
+        dy = TOI(dwarf.y) + DW_H / 2 - sy;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if (dx > ORBIT_HURT || dy > ORBIT_HURT) continue;
+        dwarf_hurt(FIX(sx));
+        game.hearts--;
+        hud_dirty = 1;
+        sfx_play(SFX_HURT);
+        particles_burst(FIX(sx), FIX(sy), 1, 4, VEL(150));
+        if (game.hearts == 0) game_lose(TXT_BURNT);
+        return;
+    }
+}
+
 /* Le punte non perdonano: un solo contatto e la cava ricomincia. */
 static void check_spikes(void)
 {
@@ -340,6 +364,7 @@ static void update_play(void)
     u8 i;
 
     for (i = 0; i < plat_count; i++) plat_update(&plats[i]);
+    for (i = 0; i < orbit_count; i++) orbit_update(&orbits[i]);
     dwarf_update();
     for (i = 0; i < block_count; i++) block_update(&blocks[i]);
     for (i = 0; i < imp_count; i++)
@@ -348,6 +373,8 @@ static void update_play(void)
 
     check_carry();
     check_spikes();
+    if (game.state != ST_PLAY) return;
+    check_orbits();
     if (game.state != ST_PLAY) return;
     check_contact();
     if (game.state != ST_PLAY) return;
@@ -634,6 +661,13 @@ static void draw_imps(void)
                    TOI(im->y) - 12 - game.cam_y + HUD_H,
                    3, 3, TILE_ATTR(tile, 2, 0, 0, 0));
 
+        /* Lo svelto non ha un disegno suo: si riconosce dalla scintilla che
+           si lascia dietro, messa dove si trovava quattro quadri fa. */
+        if (im->kind == IMP_K_SWIFT && im->state == IMP_ROAM)
+            sprite_add(TOI(im->x - (im->vx << 2)) - 4 - game.cam_x,
+                       TOI(im->y - (im->vy << 2)) - 4 - game.cam_y + HUD_H,
+                       1, 1, TILE_ATTR(TILE_SPARK + 1, 1, 0, 0, 0));
+
         /* Quanto manca al risveglio: nell'originale è un cerchio attorno allo
            spiritello, qui una barra sopra la testa — due celle da otto passi
            l'una, che il VDP disegna con un disegno già pronto per livello. */
@@ -671,6 +705,11 @@ static void draw_plats(void)
     for (i = 0; i < plat_count; i++) {
         const Plat *p = &plats[i];
         u16 base = (p->cells >= 5) ? TILE_PLANK5 : TILE_PLANK4;
+        if (!p->on) continue;
+        /* negli ultimi quaranta quadri lampeggia: il preavviso è la metà del
+           gioco, senza sarebbe solo un tranello */
+        if (p->kind == PLAT_BLINK && p->phase > BLINK_ON - BLINK_WARN &&
+            (p->phase & 4)) continue;
         u8 tiles = (u8)(p->cells * 2), done = 0;
         s16 sx = TOI(p->x) - game.cam_x;
         s16 sy = p->y - game.cam_y + HUD_H;
@@ -700,6 +739,24 @@ static void draw_portal(void)
                TILE_ATTR(TILE_PORTAL + 2 * PORTAL_QUAD_TILES, 2, 0, 0, 0));
     sprite_add((s16)(sx + 24), (s16)(sy + 32), 3, 4,
                TILE_ATTR(TILE_PORTAL + 3 * PORTAL_QUAD_TILES, 2, 0, 0, 0));
+}
+
+/* Le scintille che girano, col loro perno: due disegni che esistono gia'. */
+static void draw_orbits(void)
+{
+    u8 i;
+    for (i = 0; i < orbit_count; i++) {
+        const Orbit *o = &orbits[i];
+        s16 sx, sy;
+        sprite_add((s16)(o->cx - 4 - game.cam_x),
+                   (s16)(o->cy - 4 - game.cam_y + HUD_H),
+                   1, 1, TILE_ATTR(TILE_DUST + 1, 0, 0, 0, 0));
+        orbit_pos(o, &sx, &sy);
+        sprite_add((s16)(sx - 8 - game.cam_x),
+                   (s16)(sy - 8 - game.cam_y + HUD_H),
+                   2, 2, TILE_ATTR(TILE_FIRE + ((game.time >> 3) & 1) * 4,
+                                   1, 0, 0, 0));
+    }
 }
 
 /* Le casse che si accatastano sul macchinario a ogni consegna. */
@@ -818,6 +875,7 @@ static void draw_world_sprites(u8 mode, u16 t)
     draw_crates();
     draw_plats();
     draw_blocks();
+    draw_orbits();
     draw_imps();
     if (mode == DWARF_PLAY) draw_dwarf();
     else if (mode == DWARF_PORTAL && t >= SPIRAL_FRONT) draw_dwarf_portal(t);

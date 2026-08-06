@@ -26,6 +26,7 @@
 
 #define TXT_LOST         "The imps got the better of you"
 #define TXT_SPIKES       "The spikes on the block never forgive"
+#define TXT_BURNT        "Those sparks bite"
 #define TXT_RETRY        "back to the top of the cave..."
 #define TXT_CLEARED      "cave cleared!"
 
@@ -33,7 +34,7 @@
 #define TXT_PAUSE_HELP   "START resumes   A restarts"
 
 #define TXT_FINALE       "ALL BOXED UP"
-#define TXT_FOUR_CAVES   "four caves cleared in"
+#define TXT_FOUR_CAVES   "every cave cleared in"
 #define TXT_SECONDS      "seconds"
 #define TXT_HAMMERS      "hammer blows:"
 #define TXT_BEST         "best:"
@@ -57,6 +58,7 @@
 
 #define TXT_LOST         "Gli spiritelli hanno avuto la meglio"
 #define TXT_SPIKES       "Le punte del blocco non perdonano"
+#define TXT_BURNT        "Le scintille pungono"
 #define TXT_RETRY        "si ricomincia la cava..."
 #define TXT_CLEARED      "cava ripulita!"
 
@@ -64,7 +66,7 @@
 #define TXT_PAUSE_HELP   "START riprende   A ricomincia"
 
 #define TXT_FINALE       "TUTTI INSCATOLATI"
-#define TXT_FOUR_CAVES   "quattro cave ripulite in"
+#define TXT_FOUR_CAVES   "tutte le cave ripulite in"
 #define TXT_SECONDS      "secondi"
 #define TXT_HAMMERS      "martellate:"
 #define TXT_BEST         "record:"

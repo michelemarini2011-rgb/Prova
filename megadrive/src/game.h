@@ -41,6 +41,7 @@ typedef s32 fix;                        /* 65536 = un pixel */
 #define MAX_IMPS      8
 #define MAX_BLOCKS    6
 #define MAX_PLATS     6
+#define MAX_ORBITS    6
 #define MAX_PARTICLES 14
 #define HEARTS        3
 
@@ -94,11 +95,17 @@ typedef struct {
 
 enum { IMP_ROAM, IMP_STUNNED, IMP_CARRIED, IMP_BOXED };
 
+/* Le razze di spiritello. Lo svelto ha lo stesso disegno: corre una volta e
+   mezzo, si sveglia prima e si porta dietro una scia di scintille, che è il
+   modo di distinguerlo senza spendere un disegno. */
+enum { IMP_K_PLAIN, IMP_K_SWIFT };
+
 typedef struct {
     fix x, y, vx, vy;                   /* centro dello spiritello */
     fix home_x, home_y;
     u16 stun;
     u8  state;
+    u8  kind;
     u16 anim;
     u16 bob;                            /* fase, 8.8 di giro */
     u8  phase;
@@ -124,12 +131,44 @@ typedef struct {
 /* --------------------------------------------------------- assi mobili */
 #define PLAT_H 8
 
+/* Tre tipi, stesso disegno: quella che va avanti e indietro, quella che sale
+   e scende, e quella che c'è e non c'è. */
+enum { PLAT_SLIDE, PLAT_LIFT, PLAT_BLINK };
+
+/* L'ascensore fa una corsa sua, tre celle sopra e tre sotto il punto dove sta
+   nella mappa: legarlo al soffitto voleva dire costruirgli un pozzo attorno,
+   e disegnare le cave diventava un rompicapo. Il terreno lo ferma lo stesso. */
+#define LIFT_RANGE PXI(96)
+
+/* L'intermittenza: quanto resta, quanto sparisce, e da quando lampeggia per
+   avvisare. Il preavviso non è un vezzo: senza, sparirebbe sotto i piedi. */
+#define BLINK_ON   150
+#define BLINK_OFF   66
+#define BLINK_WARN  40
+
 typedef struct {
     fix x, dx;
-    s16 y, w;
-    fix vx;
+    fix fy, dy;                         /* la quota, con i decimali, e il passo */
+    s16 y, y0, w;                       /* y0: la quota di partenza */
+    fix vx, vy;
     u8  cells;
+    u8  kind;
+    u16 phase;                          /* per l'intermittenza */
+    u8  on;
 } Plat;
+
+/* ------------------------------------------------------ scintille in giro */
+/* Una scintilla che gira attorno a un perno: nessun disegno nuovo (è quella
+   delle particelle) e nessun ragionamento, solo un angolo che avanza. */
+#define ORBIT_R     PXI(80)
+#define ORBIT_HURT  PXI(20)             /* quanto è larga la parte che scotta */
+
+typedef struct {
+    s16 cx, cy;                         /* il perno, in pixel */
+    s16 r;
+    u8  phase;
+    s8  dir;
+} Orbit;
 
 /* ---------------------------------------------------------- particelle */
 typedef struct {
@@ -163,7 +202,8 @@ extern Dwarf dwarf;
 extern Imp imps[MAX_IMPS];
 extern Block blocks[MAX_BLOCKS];
 extern Plat plats[MAX_PLATS];
-extern u8 imp_count, block_count, plat_count;
+extern Orbit orbits[MAX_ORBITS];
+extern u8 imp_count, block_count, plat_count, orbit_count;
 
 /* --------------------------------------------------------------- arena */
 extern const ArenaDef *arena;
@@ -215,6 +255,8 @@ void imp_shock(Imp *im, fix fx, fix fy, fix power, u16 stun);
 void imp_break_free(Imp *im);
 void block_update(Block *b);
 void plat_update(Plat *p);
+void orbit_update(Orbit *o);
+void orbit_pos(const Orbit *o, s16 *x, s16 *y);
 Plat *land_on(fix x, fix y, s16 w, s16 h, fix vy, fix prev_bottom, u8 dropping);
 
 /* ------------------------------------------------------------- effetti */

@@ -6,7 +6,8 @@ Dwarf dwarf;
 Imp   imps[MAX_IMPS];
 Block blocks[MAX_BLOCKS];
 Plat  plats[MAX_PLATS];
-u8 imp_count, block_count, plat_count;
+Orbit orbits[MAX_ORBITS];
+u8 imp_count, block_count, plat_count, orbit_count;
 
 void game_on_hammer(fix x, fix y);
 void game_on_jump(void);
@@ -22,6 +23,7 @@ Plat *land_on(fix x, fix y, s16 w, s16 h, fix vy, fix prev_bottom, u8 dropping)
         Plat *p = &plats[i];
         fix px = p->x;
         fix bottom = y + FIX(h);
+        if (!p->on) continue;                           /* quella spenta non c'è */
         if (x + FIX(w) <= px + FIX(2) || x >= px + FIX(p->w - 2)) continue;
         if (prev_bottom > FIX(p->y + 4)) continue;      /* era già sotto */
         if (bottom < FIX(p->y) || bottom > FIX(p->y + 12)) continue;
@@ -136,8 +138,11 @@ void dwarf_update(void)
 
     /* trasportato dall'asse sotto i piedi, che si è già mossa */
     if (dwarf.rider >= 0) {
-        fix d = plats[dwarf.rider].dx;
-        if (d) dwarf_move_x(d);
+        Plat *p = &plats[dwarf.rider];
+        if (p->dx) dwarf_move_x(p->dx);
+        /* l'ascensore lo porta su e giù: il passo passa dalla stessa
+           risoluzione delle collisioni, o salendo lo infilerebbe nel soffitto */
+        if (p->dy) dwarf_move_y(p->dy);
         dwarf.rider = -1;
     }
 
@@ -255,7 +260,8 @@ void imp_shock(Imp *im, fix fx, fix fy, fix power, u16 stun)
         im->vy = (power * uy) >> 8;
     }
     if (im->vy > -VEL(120)) im->vy = -VEL(120);      /* sempre un po' in su */
-    im->stun = stun;
+    /* lo svelto si riprende in tre quinti del tempo: 154/256 e via */
+    im->stun = (im->kind == IMP_K_SWIFT) ? (u16)((stun * 154) >> 8) : stun;
     if (im->state != IMP_CARRIED) im->state = IMP_STUNNED;
     im->grounded = 0;
     im->flee = 0;
@@ -339,7 +345,7 @@ void imp_update(Imp *im, u8 think)
     u8 near, diving, flee;
     s16 k;
 
-    im->anim++;
+    im->anim += (u16)((im->kind == IMP_K_SWIFT) ? 2 : 1);
     if (im->flee) im->flee--;
 
     if (im->state == IMP_CARRIED) {
@@ -413,6 +419,7 @@ void imp_update(Imp *im, u8 think)
 
     sp = vec_len(im->vx, im->vy);
     max = (fix)arena->speed;
+    if (im->kind == IMP_K_SWIFT) max += max >> 1;       /* una volta e mezzo */
     max = flee ? ((max * 77) >> 5) : (diving ? ((max * 83) >> 5) : (max + (max >> 1)));
     if (sp > max && (sp >> 8) > 0) {
         fix ratio = max / (sp >> 8);            /* 0..256 */
@@ -508,7 +515,9 @@ static void block_move_y(Block *b, fix dy)
 void block_update(Block *b)
 {
     if (b->rider >= 0) {
-        block_move_x(b, plats[b->rider].dx);
+        Plat *p = &plats[b->rider];
+        block_move_x(b, p->dx);
+        if (p->dy) block_move_y(b, p->dy);
         b->rider = -1;
     }
     b->vy += BLK_GRAVITY;
@@ -524,10 +533,53 @@ void block_update(Block *b)
 
 /* ------------------------------------------------------------ assi mobili */
 
+/* L'ascensore: sale e scende fra il terreno sopra e quello sotto. Il rimbalzo
+   guarda la riga di celle che sta per invadere, per tutta la larghezza. */
+static void plat_update_lift(Plat *p)
+{
+    fix before = p->fy;
+    fix ny = p->fy + p->vy;
+    s16 dir = (p->vy > 0) ? 1 : -1;
+    s16 lead = (dir > 0) ? (TOI(ny) + PLAT_H - 1) : TOI(ny);
+    s16 ty = lead >> CELL_BITS;
+    s16 cx0 = TOI(p->x) >> CELL_BITS;
+    s16 cx1 = (TOI(p->x) + p->w - 1) >> CELL_BITS;
+    s16 cx;
+    u8 blocked = 0;
+
+    if (lead < 0 || lead >= (s16)arena_h) blocked = 1;
+    if (dir > 0 && TOI(ny) > p->y0 + LIFT_RANGE) blocked = 1;
+    if (dir < 0 && TOI(ny) < p->y0 - LIFT_RANGE) blocked = 1;
+    for (cx = cx0; cx <= cx1 && !blocked; cx++)
+        if (arena_solid(cx, ty)) blocked = 1;
+
+    if (blocked) {
+        p->vy = -p->vy;
+        ny = before;
+    }
+    p->fy = ny;
+    p->y = TOI(ny);
+    p->dy = p->fy - before;
+    p->dx = 0;
+}
+
+/* L'asse a intermittenza: un giro di lancetta, e negli ultimi quaranta quadri
+   lampeggia per dire che sta per sparire. */
+static void plat_update_blink(Plat *p)
+{
+    p->dx = p->dy = 0;
+    p->phase++;
+    if (p->phase >= BLINK_ON + BLINK_OFF) p->phase = 0;
+    p->on = (u8)(p->phase < BLINK_ON);
+}
+
 void plat_update(Plat *p)
 {
     fix before = p->x;
     s16 dir = (p->vx > 0) ? 1 : -1;
+
+    if (p->kind == PLAT_LIFT) { plat_update_lift(p); return; }
+    if (p->kind == PLAT_BLINK) { plat_update_blink(p); return; }
     fix nx = p->x + p->vx;
     fix stop = 0;
     u8 stopped = 0;
@@ -574,4 +626,18 @@ void plat_update(Plat *p)
     }
     p->x = nx;
     p->dx = p->x - before;
+    p->dy = 0;
+}
+
+/* ------------------------------------------------------ scintille in giro */
+
+void orbit_update(Orbit *o)
+{
+    o->phase = (u8)(o->phase + (o->dir > 0 ? 2 : -2));
+}
+
+void orbit_pos(const Orbit *o, s16 *x, s16 *y)
+{
+    *x = (s16)(o->cx + ((cos_t(o->phase) * o->r) >> 8));
+    *y = (s16)(o->cy + ((sin_t(o->phase) * o->r) >> 8));
 }

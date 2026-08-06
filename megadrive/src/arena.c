@@ -125,6 +125,7 @@ void arena_load(u8 index)
     imp_count = 0;
     block_count = 0;
     plat_count = 0;
+    orbit_count = 0;
     has_machine = 0;
     machine_crates = 0;
     start_x = FIX(CELL * 2);
@@ -147,10 +148,23 @@ void arena_load(u8 index)
                 portal_y = FIX((cy + 1) * CELL);
                 break;
             case CELL_SPAWN:
+            case CELL_SWIFT:
                 if (imp_count < MAX_IMPS) {
                     Imp *im = &imps[imp_count++];
                     im->home_x = cxpix;
                     im->home_y = FIX(cy * CELL + CELL / 2);
+                    im->kind = (c == CELL_SWIFT) ? IMP_K_SWIFT : IMP_K_PLAIN;
+                }
+                break;
+            case CELL_ORBIT:
+                if (orbit_count < MAX_ORBITS) {
+                    Orbit *o = &orbits[orbit_count];
+                    o->cx = (s16)(cx * CELL + CELL / 2);
+                    o->cy = (s16)(cy * CELL + CELL / 2);
+                    o->r = ORBIT_R;
+                    o->phase = (u8)(orbit_count * 61);   /* sfasate fra loro */
+                    o->dir = (orbit_count & 1) ? -1 : 1;
+                    orbit_count++;
                 }
                 break;
             case CELL_BLOCK:
@@ -161,19 +175,47 @@ void arena_load(u8 index)
                 }
                 break;
             case CELL_MOVER:
-                if (arena_cell(cx - 1, cy) != CELL_MOVER && plat_count < MAX_PLATS) {
+            case CELL_LIFT:
+            case CELL_BLINK_A:
+            case CELL_BLINK_B:
+                /* le celle di fila fanno una sola asse: si conta da sinistra */
+                if (arena_cell(cx - 1, cy) != c && plat_count < MAX_PLATS) {
                     Plat *p = &plats[plat_count++];
                     u8 n = 1;
-                    while (arena_cell(cx + n, cy) == CELL_MOVER) n++;
+                    while (arena_cell(cx + n, cy) == c) n++;
                     p->cells = n;
                     p->x = FIX(cx * CELL);
                     p->y = (s16)(cy * CELL);
+                    p->y0 = p->y;
+                    p->fy = FIX(p->y);
                     p->w = (s16)(n * CELL);
-                    /* una sì e una no parte verso sinistra */
-                    p->vx = (mover_index & 1) ? -(fix)arena->plat_speed
-                                              : (fix)arena->plat_speed;
-                    p->dx = 0;
-                    mover_index++;
+                    p->vx = p->vy = 0;
+                    p->dx = p->dy = 0;
+                    p->phase = 0;
+                    p->on = 1;
+                    if (c == CELL_MOVER) {
+                        p->kind = PLAT_SLIDE;
+                        /* una sì e una no parte verso sinistra */
+                        p->vx = (mover_index & 1) ? -(fix)arena->plat_speed
+                                                  : (fix)arena->plat_speed;
+                        mover_index++;
+                    } else if (c == CELL_LIFT) {
+                        p->kind = PLAT_LIFT;
+                        /* un ascensore lento è una sala d'attesa: va una volta
+                           e mezzo l'asse che scorre */
+                        {
+                            fix v = (fix)arena->plat_speed;
+                            v += v >> 1;
+                            p->vy = (mover_index & 1) ? -v : v;
+                        }
+                        mover_index++;
+                    } else {
+                        p->kind = PLAT_BLINK;
+                        /* le due lettere sono i due tempi: mentre una c'è,
+                           l'altra non c'è */
+                        p->phase = (c == CELL_BLINK_B) ? BLINK_ON : 0;
+                        p->on = (c != CELL_BLINK_B);
+                    }
                 }
                 break;
             case CELL_MACHINE:

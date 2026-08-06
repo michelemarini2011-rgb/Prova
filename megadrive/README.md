@@ -1,8 +1,10 @@
 # Martello & Scatole — versione per Sega Mega Drive
 
 Conversione del gioco HTML5 *Martello & Scatole* in una cartuccia per Sega Mega
-Drive / Genesis: stesse quattro cave, stessi movimenti, stessa regia, scritta
-in C e assembly 68000 e compilata in una ROM da 512 KB.
+Drive / Genesis: stessi movimenti, stessa regia, scritta in C e assembly 68000
+e compilata in una ROM da 512 KB. Le quattro cave dell'originale ci sono tutte,
+più tre nuove che introducono una cosa per volta — gli ascensori, le assi a
+tempo, le scintille — infilate fra quelle vecchie in ordine di difficoltà.
 
 ## Giocare
 
@@ -28,6 +30,11 @@ caduta senza volerlo.
 Obiettivo: stordire gli spiritelli a martellate, trascinarli fino al
 macchinario e inscatolarli tutti; poi si attraversa il portale che si apre.
 Tre cuori, le punte dei blocchi irti uccidono al primo tocco.
+
+Nelle cave nuove: le **assi verdi** salgono e scendono da sole, le **gialle**
+ci sono e non ci sono (e lampeggiano prima di sparire), le **palle di fuoco**
+girano attorno a un perno e costano un cuore, e gli **spiritelli con la scia**
+corrono una volta e mezzo e si svegliano prima.
 
 Due cose da guardare mentre si gioca: la **barra sopra la testa** dello
 spiritello stordito dice quanto manca prima che si svegli (se lo si sta
@@ -81,10 +88,11 @@ src/entities.c    nano, spiritelli, blocchi irti, assi mobili
 src/game.c        stati, onda d'urto, macchinario, portale, pannello, sprite
 src/fault.c       schermata di errore se il processore inciampa
 res/gfx.*         disegni e tavolozze (generati)
-res/levels.*      le quattro cave (generate)
+res/levels.*      le sette cave (generate)
 tools/md_assets.py   converte i PNG dell'originale nel formato del VDP
 tools/md_levels.py   converte le mappe delle cave
 tools/make_logo_en.py disegna il logo della versione inglese
+tools/preview_levels.py  disegna le cave e ne controlla i limiti
 tools/checkalign.py  cerca accessi disallineati nel codice compilato
 tools/fixrom.py      riempimento e checksum della cartuccia
 ```
@@ -129,6 +137,36 @@ pixel al secondo e un passo di 1/120 di secondo. Qui:
 Il piano di gioco del VDP è alto 256 pixel e le cave arrivano a 768: le righe
 di celle si ridipingono man mano che la vista sale, due per volta, dentro il
 ritorno di quadro.
+
+### Cave e cose nuove
+
+Le tre cave nuove non aggiungono disegni (solo la palla di fuoco, che sono otto
+celle): tutto il resto è codice e mappe.
+
+- **l'ascensore** è l'asse mobile con la velocità sulla y invece che sulla x.
+  La corsa è fissa, tre celle sopra e tre sotto il punto dove sta nella mappa:
+  la prima versione rimbalzava contro il soffitto, e disegnare una cava voleva
+  dire costruire un pozzo attorno a ogni ascensore. Chi ci sta sopra viene
+  portato su e giù passando dalla stessa risoluzione delle collisioni del nano,
+  o salendo lo infilerebbe nel soffitto;
+- **l'asse a intermittenza** è la stessa asse con un contatore: centocinquanta
+  quadri c'è, sessantasei non c'è, e negli ultimi quaranta lampeggia. Le due
+  lettere della mappa (`i` e `j`) sono i due tempi opposti, così mentre una c'è
+  l'altra non c'è e la strada esiste sempre, ma mai tutta insieme;
+- **lo spiritello svelto** è lo stesso spiritello con un campo in più: corre una
+  volta e mezzo, dorme tre quinti del tempo e si porta dietro una scintilla,
+  messa dov'era quattro quadri fa. Zero disegni nuovi: la scia è il modo di
+  distinguerlo;
+- **la palla di fuoco** gira attorno a un perno e basta un angolo che avanza —
+  niente ragionamento, niente collisioni col terreno. Il disegno è generato a
+  fasce concentriche da `tools/md_assets.py`: un pallino da otto pixel non si
+  vedeva abbastanza per una cosa che costa un cuore.
+
+Le mappe stanno in `tools/arenas.json` e si guardano con
+`tools/preview_levels.py`, che le disegna tutte in fila e controlla quello che
+il gioco dà per scontato: larghezza trenta, un solo punto di partenza, un solo
+portale, il macchinario che occupa davvero quattro celle per quattro, e i tetti
+delle strutture (otto spiritelli, sei blocchi, sei assi, sei scintille).
 
 ### Quello che si vede senza leggerlo
 

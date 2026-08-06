@@ -417,6 +417,31 @@ def main():
     arrow_right = paint(arrow)                  # sinistra: la stessa, ribaltata
     arrow_up = paint(rot_ccw(arrow))            # giù: la stessa, capovolta
 
+    # La palla di fuoco che gira attorno al perno: due fotogrammi che pulsano,
+    # a fasce concentriche. Un pallino da otto pixel non bastava — è un
+    # ostacolo che costa un cuore e si deve vedere da lontano.
+    fire_base = None
+    for frame in range(2):
+        cell = [[0] * 16 for _ in range(16)]
+        outer = 7.5 - frame * 0.8
+        for y in range(16):
+            for x in range(16):
+                dx, dy = x - 7.5, y - 7.5
+                d = (dx * dx + dy * dy) ** 0.5
+                if d > outer:
+                    continue
+                if d < outer * 0.42:
+                    cell[y][x] = nearest(1, (255, 255, 145))
+                elif d < outer * 0.68:
+                    cell[y][x] = nearest(1, (255, 218, 109))
+                elif d < outer * 0.87:
+                    cell[y][x] = nearest(1, (255, 182, 109))
+                else:
+                    cell[y][x] = nearest(1, (145, 36, 0))
+        t = paint(cell)
+        if fire_base is None:
+            fire_base = t
+
     # Nove livelli di riempimento: la barra è larga due celle, quindi ogni
     # cella prende il suo pezzo di riempimento e insieme fanno sedici passi.
     bar_base = None
@@ -600,6 +625,7 @@ def main():
         f.write(f"#define TILE_ARROW_R   {arrow_right}   /* 2x2, punta a destra */\n")
         f.write(f"#define TILE_ARROW_U   {arrow_up}   /* 2x2, punta in alto */\n")
         f.write(f"#define TILE_BAR       {bar_base}   /* 9 livelli, da vuoto a pieno */\n")
+        f.write(f"#define TILE_FIRE      {fire_base}   /* 2x2, due fotogrammi */\n")
         f.write(f"#define TILE_CRATE     {crate[0]}\n")
         f.write(f"#define TILE_PLANK4    {strips[4]}\n")
         f.write(f"#define TILE_PLANK5    {strips[5]}\n")

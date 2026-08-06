@@ -17,6 +17,9 @@ COLS = 30
 CODE = {
     ".": 0, "#": 1, "=": 2, "~": 3, "x": 4, "S": 5,
     "P": 6, "O": 7, "M": 8, "b": 9, "r": 10, "f": 11,
+    # roba nuova: assi che salgono, assi a intermittenza (accesa e spenta),
+    # spiritelli svelti, perni delle scintille
+    "|": 12, "i": 13, "j": 14, "V": 15, "o": 16,
 }
 
 # Le lettere accentate non stanno in ASCII: nel gioco viaggiano come codici
@@ -85,7 +88,8 @@ def main():
         for name, code in [("EMPTY", 0), ("SOLID", 1), ("ONEWAY", 2), ("MOVER", 3),
                            ("BLOCK", 4), ("SPAWN", 5), ("START", 6), ("PORTAL", 7),
                            ("MACHINE", 8), ("DECOR_B", 9), ("DECOR_R", 10),
-                           ("DECOR_F", 11)]:
+                           ("DECOR_F", 11), ("LIFT", 12), ("BLINK_A", 13),
+                           ("BLINK_B", 14), ("SWIFT", 15), ("ORBIT", 16)]:
             f.write(f"#define CELL_{name:<8} {code}\n")
         f.write("""
 typedef struct {
