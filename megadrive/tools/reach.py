@@ -126,6 +126,10 @@ def reachable(grid, start, extra):
 
 def check(a, index):
     rows = a["rows"]
+    # La cava del mostro è un'arena piatta: non si sale da nessuna parte, e non
+    # deve. Qui il controllo non ha niente da dire.
+    if a.get("boss"):
+        return []
     grid = load(rows)
     bad = []
 

@@ -3,7 +3,7 @@
 #define LEVELS_H
 #include "md.h"
 
-#define ARENA_COUNT 13
+#define ARENA_COUNT 16
 #define ARENA_COLS  30
 
 /* Codici delle celle. */
@@ -31,6 +31,7 @@
 #define CELL_BAT      21
 #define CELL_MOLE     22
 #define CELL_CART     23
+#define CELL_BOSS     24
 
 typedef struct {
     const char *name;
@@ -40,6 +41,7 @@ typedef struct {
     u16 stun;        /* durata del torpore, in quadri */
     u16 speed;       /* velocità degli spiritelli, 8.8 px/quadro */
     u16 plat_speed;  /* velocità delle assi mobili */
+    u8  boss;        /* 0 nessuno, 1 golem, 2 verme, 3 regina */
 } ArenaDef;
 
 extern const ArenaDef arenas[ARENA_COUNT];

@@ -45,6 +45,7 @@ INK = {
     "b": (70, 150, 70),         # cespuglio
     "r": (120, 120, 120),       # sasso
     "f": (240, 120, 160),       # fiore
+    "B": (255, 60, 60),         # tana del mostro
 }
 
 IMPS = "SVAt"           # anche le talpe sono spiritelli                    # tutte le razze contano sullo stesso tetto
@@ -62,9 +63,22 @@ def check(a, index):
             if c not in INK:
                 bad.append(f"riga {r}: simbolo sconosciuto {c!r}")
     joined = "".join(rows)
-    for sym, name in (("P", "partenze"), ("O", "portali"), ("M", "macchinari")):
+    # Nella cava del mostro non c'è macchinario: non si inscatola niente. Ci
+    # sono invece le tane, da una a quattro (il verme se le gira tutte).
+    wanted = ("P", "partenze"), ("O", "portali")
+    if not a.get("boss"):
+        wanted += (("M", "macchinari"),)
+    for sym, name in wanted:
         if joined.count(sym) != 1:
             bad.append(f"{joined.count(sym)} {name} invece di uno")
+    if a.get("boss"):
+        n = joined.count("B")
+        if not 1 <= n <= 4:
+            bad.append(f"{n} tane del mostro: ne servono da una a quattro")
+        if sum(joined.count(c) for c in IMPS):
+            bad.append("nella cava del mostro non ci vanno spiritelli")
+    elif joined.count("B"):
+        bad.append("una tana senza mostro")
     if sum(joined.count(c) for c in IMPS) > 8:
         bad.append("più di otto spiritelli")
     for sym, cap, name in LIMITS:

@@ -23,11 +23,13 @@
 
 #define TXT_CAVE         "cave"
 #define TXT_IMPS_TO_BOX  "imps to box up:"
+#define TXT_ONE_MONSTER  "one monster, and nothing else"
 
 #define TXT_LOST         "The imps got the better of you"
 #define TXT_SPIKES       "The spikes on the block never forgive"
 #define TXT_BURNT        "Those sparks bite"
 #define TXT_BAT          "The bats own this cave"
+#define TXT_BOSS_LOST    "It was bigger than you"
 #define TXT_RETRY        "back to the top of the cave..."
 #define TXT_CLEARED      "cave cleared!"
 
@@ -56,11 +58,13 @@
 
 #define TXT_CAVE         "cava"
 #define TXT_IMPS_TO_BOX  "spiritelli da inscatolare:"
+#define TXT_ONE_MONSTER  "un mostro solo, e nient'altro"
 
 #define TXT_LOST         "Gli spiritelli hanno avuto la meglio"
 #define TXT_SPIKES       "Le punte del blocco non perdonano"
 #define TXT_BURNT        "Le scintille pungono"
 #define TXT_BAT          "I pipistrelli comandano qui"
+#define TXT_BOSS_LOST    "Era pi\006 grosso di te"
 #define TXT_RETRY        "si ricomincia la cava..."
 #define TXT_CLEARED      "cava ripulita!"
 

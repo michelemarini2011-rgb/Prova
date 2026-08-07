@@ -8,7 +8,9 @@ Block blocks[MAX_BLOCKS];
 Plat  plats[MAX_PLATS];
 Orbit orbits[MAX_ORBITS];
 Bat   bats[MAX_BATS];
-u8 imp_count, block_count, plat_count, orbit_count, bat_count;
+Boss  boss;
+Shot  shots[MAX_SHOTS];
+u8 imp_count, block_count, plat_count, orbit_count, bat_count, shot_count;
 
 void game_on_hammer(fix x, fix y);
 void game_on_jump(void);
@@ -748,4 +750,259 @@ void orbit_pos(const Orbit *o, s16 *x, s16 *y)
 {
     *x = (s16)(o->cx + ((cos_t(o->phase) * o->r) >> 8));
     *y = (s16)(o->cy + ((sin_t(o->phase) * o->r) >> 8));
+}
+
+/* --------------------------------------------------------------- i mostri */
+
+/* La quota del primo terreno sotto un punto, in pixel. I mostri camminano e si
+   posano, e nessuno dei tre ha bisogno di sapere altro della mappa. */
+s16 ground_below(s16 px, s16 py)
+{
+    s16 cx = px >> CELL_BITS;
+    s16 cy = py >> CELL_BITS;
+    while (cy < (s16)arena_rows && !arena_solid(cx, cy)) cy++;
+    return (s16)(cy * CELL);
+}
+
+/* Uno sputo verso un punto. La mira è la posizione di adesso, non quella di
+   fra un secondo: al mostro tocca sbagliare se il nano si muove, altrimenti
+   non ci sarebbe niente da schivare. */
+static void shot_spawn(fix x, fix y, s16 tx, s16 ty, fix speed)
+{
+    Shot *s;
+    s16 dx = (s16)(tx - TOI(x));
+    s16 dy = (s16)(ty - TOI(y));
+    u16 len;
+    if (shot_count >= MAX_SHOTS) return;
+    len = isqrt32((u32)((s32)dx * dx + (s32)dy * dy));
+    if (len < 1) len = 1;
+    s = &shots[shot_count++];
+    s->x = x;
+    s->y = y;
+    s->vx = (fix)(((s32)dx * (speed >> 8)) / len) << 8;
+    s->vy = (fix)(((s32)dy * (speed >> 8)) / len) << 8;
+    s->life = 150;
+}
+
+void shots_update(void)
+{
+    u8 i = 0;
+    while (i < shot_count) {
+        Shot *s = &shots[i];
+        s->vy += SHOT_GRAV;
+        s->x += s->vx;
+        s->y += s->vy;
+        if (--s->life == 0 ||
+            arena_solid(TOI(s->x) >> CELL_BITS, TOI(s->y) >> CELL_BITS)) {
+            particles_burst(s->x, s->y, 1, 3, VEL(120));
+            shots[i] = shots[--shot_count];
+        } else {
+            i++;
+        }
+    }
+}
+
+/* Il Golem cammina piano verso il nano e ogni tanto salta addosso. Quando
+   ricade sbatte per terra — e chi sta col piede a terra lo sente — poi resta
+   accasciato un paio di secondi: è lì che si martella. */
+static void golem_update(void)
+{
+    s16 feet, floor;
+
+    boss.vy += ACC(2300);
+    boss.y += boss.vy;
+    boss.x += boss.vx;
+
+    feet = TOI(boss.y) + BOSS_RY;
+    floor = ground_below(TOI(boss.x), feet - CELL);
+    if (feet >= floor) {
+        boss.y = FIX(floor - BOSS_RY);
+        if (boss.vy > 0 && boss.phase == BP_WIND) {
+            boss.slam = 1;
+            boss.phase = BP_OPEN;
+            boss.pose = 1;
+            boss.timer = 100;
+            boss.vx = 0;
+            particles_burst(boss.x, FIX(floor), 0, 8, VEL(230));
+        }
+        boss.vy = 0;
+    }
+    /* i fianchi della cava lo rimandano indietro */
+    if (TOI(boss.x) < BOSS_RX) { boss.x = FIX(BOSS_RX); boss.vx = 0; }
+    if (TOI(boss.x) > WORLD_W - BOSS_RX) {
+        boss.x = FIX(WORLD_W - BOSS_RX);
+        boss.vx = 0;
+    }
+
+    if (boss.timer) boss.timer--;
+    switch (boss.phase) {
+    case BP_MOVE:
+        boss.vx = (dwarf.x + FIX(DW_W / 2) < boss.x) ? -VEL(160) : VEL(160);
+        if (boss.timer == 0) {
+            boss.phase = BP_WIND;
+            boss.vy = -VEL(600);
+            boss.vx = (dwarf.x + FIX(DW_W / 2) < boss.x) ? -VEL(300) : VEL(300);
+        }
+        break;
+    case BP_WIND:
+        break;                          /* è per aria: ci pensa la gravità */
+    case BP_OPEN:
+        boss.vx = 0;
+        if (boss.timer == 0) {
+            boss.phase = BP_MOVE;
+            boss.pose = 0;
+            boss.timer = 130;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* Il Verme sta sotto e si affaccia da una buca alla volta, scegliendo quella
+   più vicina al nano: bisogna correre da lui, non aspettarlo. Fuori è sempre
+   scoperto, ma sputa, e sta fuori poco. */
+static void worm_update(void)
+{
+    u8 i, best = boss.spot;
+    s16 bestd = 32767;
+
+    if (boss.timer) boss.timer--;
+    switch (boss.phase) {
+    case BP_MOVE:                       /* sotto terra, non si vede */
+        if (boss.timer == 0) {
+            for (i = 0; i < boss.spots; i++) {
+                s16 d = (s16)(boss.spot_x[i] - TOI(dwarf.x));
+                if (d < 0) d = (s16)-d;
+                if (i != boss.spot && d < bestd) { bestd = d; best = i; }
+            }
+            boss.spot = best;
+            boss.phase = BP_WIND;
+            boss.timer = 36;           /* il preavviso: polvere dalla buca */
+        }
+        break;
+    case BP_WIND:
+        boss.x = FIX(boss.spot_x[boss.spot]);
+        boss.y = FIX(boss.spot_y[boss.spot]);
+        if ((boss.timer & 7) == 0)
+            particles_burst(boss.x, boss.y + FIX(BOSS_RY), 0, 3, VEL(150));
+        if (boss.timer == 0) {
+            boss.phase = BP_OPEN;
+            boss.pose = 1;
+            boss.timer = 140;
+            particles_burst(boss.x, boss.y + FIX(BOSS_RY), 0, 8, VEL(200));
+        }
+        break;
+    case BP_OPEN:
+        if ((boss.timer % 46) == 20 && boss.timer > 30)
+            shot_spawn(boss.x, boss.y - FIX(6),
+                       (s16)(TOI(dwarf.x) + DW_W / 2),
+                       (s16)(TOI(dwarf.y) + DW_H / 2), VEL(260));
+        if (boss.timer == 0) {
+            boss.phase = BP_MOVE;
+            boss.pose = 0;
+            boss.timer = 66;
+            particles_burst(boss.x, boss.y + FIX(BOSS_RY), 0, 6, VEL(180));
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* La Regina vola avanti e indietro e lascia cadere le scintille; ogni tanto
+   piomba giù addosso al nano e resta a terra a riprendere fiato. Quello è
+   l'unico momento in cui la si prende, e dura poco. */
+static void queen_update(void)
+{
+    s16 floor;
+
+    if (boss.timer) boss.timer--;
+    switch (boss.phase) {
+    case BP_MOVE:
+        boss.x += boss.vx;
+        if (TOI(boss.x) < BOSS_HALF || TOI(boss.x) > WORLD_W - BOSS_HALF)
+            boss.vx = -boss.vx;
+        boss.anim = (u16)(boss.anim + 3);
+        boss.y = FIX(boss.spot_y[0]) + FIX((sin_t((u8)boss.anim) * 12) >> 8);
+        if ((boss.timer % 56) == 10)
+            shot_spawn(boss.x, boss.y + FIX(10),
+                       TOI(boss.x), (s16)(TOI(boss.y) + 200), VEL(150));
+        if (boss.timer == 0) {
+            /* La picchiata: punta dov'è adesso, e da lì non cambia idea. La
+               velocità di lato è proporzionale alla distanza perché la discesa
+               dura sempre lo stesso: così arriva dove ha mirato invece di
+               sorvolare il bersaglio e schiantarsi contro il muro. */
+            s16 dx = (s16)(TOI(dwarf.x) + DW_W / 2 - TOI(boss.x));
+            boss.phase = BP_WIND;
+            boss.timer = 90;
+            boss.vx = (fix)((s32)dx * VEL(3));
+            boss.vy = VEL(400);
+        }
+        break;
+    case BP_WIND:
+        boss.x += boss.vx;
+        boss.y += boss.vy;
+        if (TOI(boss.x) < BOSS_HALF) boss.x = FIX(BOSS_HALF);
+        if (TOI(boss.x) > WORLD_W - BOSS_HALF) boss.x = FIX(WORLD_W - BOSS_HALF);
+        floor = ground_below(TOI(boss.x), TOI(boss.y));
+        if (TOI(boss.y) + BOSS_RY >= floor || boss.timer == 0) {
+            boss.y = FIX(floor - BOSS_RY);
+            boss.phase = BP_OPEN;
+            boss.pose = 1;
+            boss.timer = 78;
+            boss.vx = boss.vy = 0;
+            particles_burst(boss.x, FIX(floor), 0, 6, VEL(180));
+        }
+        break;
+    case BP_OPEN:
+        if (boss.timer == 0) {
+            boss.phase = BP_MOVE;
+            boss.pose = 0;
+            boss.timer = 170;
+            boss.vx = (rnd() & 1) ? -VEL(190) : VEL(190);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+void boss_update(void)
+{
+    if (boss.kind == BOSS_NONE || boss.phase == BP_GONE) return;
+    if (boss.hurt) boss.hurt--;
+    switch (boss.kind) {
+    case BOSS_GOLEM: golem_update(); break;
+    case BOSS_WORM:  worm_update();  break;
+    default:         queen_update(); break;
+    }
+}
+
+/* La vita di ognuno: il Golem quattro colpi, il Verme cinque, la Regina sei.
+   Non è solo il numero — il Golem si scopre spesso e sta fermo, il Verme
+   bisogna raggiungerlo, la Regina si posa per un attimo e in mezzo vola. */
+void boss_reset(void)
+{
+    static const u8 lives[4] = { 0, 4, 5, 6 };
+    boss.hp_max = lives[boss.kind & 3];
+    boss.hp = boss.hp_max;
+    boss.hurt = 0;
+    boss.slam = 0;
+    boss.anim = 0;
+    boss.spot = 0;
+    boss.pose = 0;
+    boss.vx = boss.vy = 0;
+    if (boss.kind == BOSS_NONE || boss.spots == 0) {
+        boss.phase = BP_GONE;
+        return;
+    }
+    boss.x = FIX(boss.spot_x[0]);
+    boss.y = FIX(boss.spot_y[0]);
+    boss.phase = BP_MOVE;
+    switch (boss.kind) {
+    case BOSS_GOLEM: boss.timer = 150; break;
+    case BOSS_WORM:  boss.timer = 70;  break;
+    default:         boss.timer = 180; boss.vx = VEL(190); break;
+    }
 }

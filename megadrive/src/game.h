@@ -200,6 +200,57 @@ typedef struct {
     u16 anim;
 } Bat;
 
+/* --------------------------------------------------------------- i mostri */
+/* Ogni quinta cava non ci sono spiritelli da inscatolare: c'è una bestia sola,
+   grande e con la sua vita da consumare. Il verbo però resta quello di sempre,
+   il martello: il mostro si scopre a tempo, e in quei momenti lì l'onda d'urto
+   lo prende. Fuori da quei momenti non lo tocchi, e questo è tutto il gioco —
+   riconoscere quando è aperto e trovarsi lì.
+
+   Tre bestie, una per aria: il Golem che salta e sbatte per terra, il Verme che
+   spunta dalle buche e sputa, la Regina che vola e si posa. */
+enum { BOSS_NONE, BOSS_GOLEM, BOSS_WORM, BOSS_QUEEN };
+
+/* Le fasi sono le stesse per tutti e tre, e vogliono dire la stessa cosa:
+   BP_MOVE è quando fa i fatti suoi, BP_WIND quando sta per arrivare qualcosa,
+   BP_OPEN quando è scoperto. Solo il contenuto cambia da bestia a bestia. */
+enum { BP_MOVE, BP_WIND, BP_OPEN, BP_GONE };
+
+#define BOSS_HALF   24                  /* mezzo sprite: sono tutti 48x48 */
+#define BOSS_RX     19                  /* la parte che fa male, dal centro */
+#define BOSS_RY     21
+#define BOSS_HURT   34                  /* quadri di lampeggio dopo il colpo */
+#define BOSS_SLAM   112                 /* quanto arriva lontano la sberla */
+#define MAX_SPOTS   4                   /* le buche del verme */
+
+typedef struct {
+    fix x, y, vx, vy;
+    s16 spot_x[MAX_SPOTS], spot_y[MAX_SPOTS];
+    u8  spots, spot;
+    u8  kind, hp, hp_max;
+    u8  phase, pose;
+    u16 timer;
+    u8  hurt;                           /* rinculo: lampeggia e non fa male */
+    u8  slam;                           /* un quadro solo, quando tocca terra */
+    u16 anim;
+} Boss;
+
+extern Boss boss;
+
+/* Quello che sputano. Vola dritto con un filo di peso addosso, costa un cuore
+   e si spegne contro il terreno: non serve altro. */
+#define MAX_SHOTS  4
+#define SHOT_R     9
+#define SHOT_GRAV  ACC(520)
+
+typedef struct {
+    fix x, y, vx, vy;
+    u8  life;
+} Shot;
+
+extern Shot shots[MAX_SHOTS];
+extern u8 shot_count;
+
 /* ------------------------------------------------------ scintille in giro */
 /* Una scintilla che gira attorno a un perno: nessun disegno nuovo (è quella
    delle particelle) e nessun ragionamento, solo un angolo che avanza. */
@@ -311,6 +362,10 @@ void block_update(Block *b);
 void plat_update(Plat *p);
 void orbit_update(Orbit *o);
 void bat_update(Bat *b);
+void boss_update(void);
+void boss_reset(void);
+void shots_update(void);
+s16  ground_below(s16 px, s16 py);
 void orbit_pos(const Orbit *o, s16 *x, s16 *y);
 Plat *land_on(fix x, fix y, s16 w, s16 h, fix vy, fix prev_bottom, u8 dropping);
 

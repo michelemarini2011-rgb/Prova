@@ -24,6 +24,8 @@ CODE = {
     "c": 17, "n": 18, "N": 19, "A": 20,
     # pipistrelli, talpe, carrelli da miniera
     "p": 21, "t": 22, "k": 23,
+    # la tana del mostro: la prima è dove sta, le altre sono le buche del verme
+    "B": 24,
 }
 
 # Le lettere accentate non stanno in ASCII: nel gioco viaggiano come codici
@@ -75,12 +77,13 @@ def main():
         f.write("const ArenaDef arenas[ARENA_COUNT] = {\n")
         for i, a in enumerate(arenas):
             f.write("    { T(%s, %s),\n      T(%s,\n        %s),\n"
-                    "      map%d, %d, %d, %d, %d },\n" % (
+                    "      map%d, %d, %d, %d, %d, %d },\n" % (
                         cstr(a["name"]), cstr(a["name_en"]),
                         cstr(a["hint"]), cstr(a["hint_en"]),
                         i, len(a["rows"]),
                         int(round(a["stun"] * 60)),      # torpore in quadri
-                        vel(a["speed"]), vel(a["platSpeed"])))
+                        vel(a["speed"]), vel(a["platSpeed"]),
+                        a.get("boss", 0)))
         f.write("};\n")
 
     with open(os.path.join(ROOT, "res", "levels.h"), "w") as f:
@@ -96,7 +99,7 @@ def main():
                            ("BLINK_B", 14), ("SWIFT", 15), ("ORBIT", 16),
                            ("CRUMBLE", 17), ("BELT_R", 18), ("BELT_L", 19),
                            ("ARMOR", 20), ("BAT", 21), ("MOLE", 22),
-                           ("CART", 23)]:
+                           ("CART", 23), ("BOSS", 24)]:
             f.write(f"#define CELL_{name:<8} {code}\n")
         f.write("""
 typedef struct {
@@ -107,6 +110,7 @@ typedef struct {
     u16 stun;        /* durata del torpore, in quadri */
     u16 speed;       /* velocità degli spiritelli, 8.8 px/quadro */
     u16 plat_speed;  /* velocità delle assi mobili */
+    u8  boss;        /* 0 nessuno, 1 golem, 2 verme, 3 regina */
 } ArenaDef;
 
 extern const ArenaDef arenas[ARENA_COUNT];
@@ -118,8 +122,12 @@ extern const ArenaDef arenas[ARENA_COUNT];
     for a in arenas:
         rows = a["rows"]
         joined = "".join(rows)
-        print(f"  {a['name']:24s} {len(rows)} righe, spiritelli {joined.count('S')}, "
-              f"blocchi {joined.count('x')}")
+        if a.get("boss"):
+            print(f"  {a['name']:24s} {len(rows)} righe, mostro {a['boss']}, "
+                  f"tane {joined.count('B')}")
+        else:
+            print(f"  {a['name']:24s} {len(rows)} righe, spiritelli {joined.count('S')}, "
+                  f"blocchi {joined.count('x')}")
 
 
 if __name__ == "__main__":

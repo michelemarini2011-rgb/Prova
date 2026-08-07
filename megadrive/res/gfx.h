@@ -18,6 +18,12 @@ extern const u16 machine_map[];     /* 8x8 celle */
 #define TILE_SKY       1099   /* dove si posa il cielo di turno */
 extern const u32 sky_tiles[THEME_COUNT][2424];
 extern const u16 sky_map[THEME_COUNT][2048];   /* 64x32 celle */
+#define BOSS_COUNT     3
+#define BOSS_TILES     36   /* due pose x due sprite da 24x24 */
+#define TILE_BOSS      1402   /* dove si posa il mostro di turno */
+extern const u32 boss_tiles[BOSS_COUNT][36 * 8];
+/* tavolozza di ogni mostro: il golem e la regina stanno con il nano */
+extern const u8 boss_pal[BOSS_COUNT];
 extern const u16 logo_map[];        /* 32x8 celle */
 extern const u16 logo_map_en[];     /* lo stesso, in inglese */
 extern const u16 icon_cells[];      /* 4 icone x 4 disegni */

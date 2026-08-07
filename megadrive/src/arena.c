@@ -138,7 +138,10 @@ void arena_load(u8 index)
     plat_count = 0;
     orbit_count = 0;
     bat_count = 0;
+    shot_count = 0;
     has_machine = 0;
+    boss.spots = 0;
+    boss.kind = arena->boss;
     machine_crates = 0;
     start_x = FIX(CELL * 2);
     start_y = FIX(CELL * 12);
@@ -250,6 +253,15 @@ void arena_load(u8 index)
                         p->phase = (c == CELL_BLINK_B) ? BLINK_ON : 0;
                         p->on = (c != CELL_BLINK_B);
                     }
+                }
+                break;
+            /* Le tane del mostro. La prima è dove sta all'inizio; le altre
+               servono al Verme, che si affaccia da una alla volta. */
+            case CELL_BOSS:
+                if (boss.spots < MAX_SPOTS) {
+                    boss.spot_x[boss.spots] = (s16)(cx * CELL + CELL / 2);
+                    boss.spot_y[boss.spots] = (s16)(cy * CELL + CELL / 2);
+                    boss.spots++;
                 }
                 break;
             case CELL_MACHINE:

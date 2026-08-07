@@ -320,6 +320,153 @@ SKY_NAMES = [f"sky_{name}{suf}" for name, _t, _s in THEMES for suf in ("", "_f")
 GUESTS[3] = SKY_NAMES
 
 
+# ------------------------------------------------------------------ bossi
+# Ogni quinta cava c'è un mostro solo, grande 48x48. Tre mostri per due pose
+# l'uno farebbero centosette celle: non ci stanno. Se ne tengono due cose.
+#
+# La prima: il mostro è simmetrico e in memoria video ci va solo la metà
+# sinistra, che il VDP ribalta per fare la destra. Metà del costo, e una
+# creatura che ti guarda in faccia invece di stare di profilo — per un
+# avversario piantato davanti è anche meglio.
+#
+# La seconda: come i cieli, un mostro alla volta. Il pezzo di memoria è sempre
+# quello e si riscrive quando si carica la cava, che è già a schermo nero.
+#
+# Restano due pose per mostro: quella in cui si muove e non lo si tocca, e
+# quella in cui è scoperto e si martella. Devono distinguersi da lontano, o il
+# gioco diventa indovinare.
+BOSS_NAMES = ["golem", "verme", "regina"]
+BOSS_SIZE = 48
+
+
+def _blank(w, h):
+    return [[0] * w for _ in range(h)]
+
+
+def _rect(m, x0, y0, x1, y1, v):
+    for y in range(max(0, y0), min(len(m), y1 + 1)):
+        for x in range(max(0, x0), min(len(m[0]), x1 + 1)):
+            m[y][x] = v
+
+
+def _ell(m, cx, cy, rx, ry, v):
+    for y in range(max(0, cy - ry), min(len(m), cy + ry + 1)):
+        for x in range(max(0, cx - rx), min(len(m[0]), cx + rx + 1)):
+            dx = (x - cx) / rx
+            dy = (y - cy) / ry
+            if dx * dx + dy * dy <= 1.0:
+                m[y][x] = v
+
+
+def _wedge(m, x0, x1, ytop, ybot, dtop, dbot, v):
+    """Un triangolo sdraiato: fra due bordi che si aprono andando a destra.
+    Serve per le ali, che sono la cosa più difficile da fare con i rettangoli."""
+    n = max(1, x1 - x0)
+    for x in range(max(0, x0), min(len(m[0]), x1 + 1)):
+        k = (x - x0) / n
+        a = int(round(ytop + (dtop - ytop) * k))
+        b = int(round(ybot + (dbot - ybot) * k))
+        for y in range(max(0, a), min(len(m), b + 1)):
+            m[y][x] = v
+
+
+def _mirror(m):
+    """La metà destra è lo specchio della sinistra. Si disegna solo a sinistra
+    e questo garantisce la simmetria che il ribaltamento del VDP pretende."""
+    w = len(m[0])
+    for row in m:
+        for x in range(w // 2):
+            row[w - 1 - x] = row[x]
+    return m
+
+
+def golem(open_pose):
+    """Il Golem di pietra: un muro con le gambe. In posa aperta si accascia
+    dopo la sberla al terreno, e allora la testa scende a tiro di martello."""
+    m = _blank(BOSS_SIZE, BOSS_SIZE)
+    if not open_pose:
+        _rect(m, 7, 34, 19, 47, 2)              # gamba
+        _rect(m, 5, 13, 23, 38, 2)              # tronco
+        _rect(m, 5, 13, 23, 19, 3)              # spalle in luce
+        _ell(m, 7, 17, 7, 6, 2)                 # spallaccio
+        _rect(m, 0, 19, 6, 35, 2)               # braccio
+        _rect(m, 15, 2, 23, 15, 2)              # testa
+        _rect(m, 15, 2, 23, 6, 3)
+        _rect(m, 17, 8, 21, 11, 5)              # occhio acceso
+        _rect(m, 9, 24, 18, 25, 4)              # crepe
+        _rect(m, 12, 29, 20, 30, 4)
+    else:
+        _rect(m, 6, 39, 20, 47, 2)              # gambe piegate
+        _rect(m, 3, 22, 23, 43, 2)              # tronco schiacciato
+        _rect(m, 3, 22, 23, 27, 3)
+        _rect(m, 0, 27, 6, 45, 2)               # braccia a penzoloni
+        _rect(m, 15, 11, 23, 24, 2)              # testa calata
+        _rect(m, 15, 11, 23, 14, 3)
+        _rect(m, 16, 18, 22, 19, 4)              # occhio chiuso: una fessura
+        _rect(m, 8, 32, 19, 33, 4)
+        _rect(m, 11, 37, 21, 38, 4)
+    return _mirror(m)
+
+
+def verme(open_pose):
+    """Il Verme: esce da una buca, e la bocca spalancata è il segnale che
+    adesso si può colpire. A bocca chiusa il martello ci rimbalza sopra."""
+    m = _blank(BOSS_SIZE, BOSS_SIZE)
+    _ell(m, 23, 45, 17, 9, 2)                   # gli anelli del corpo
+    _ell(m, 23, 37, 16, 8, 2)
+    _ell(m, 23, 29, 15, 8, 2)
+    _rect(m, 8, 27, 23, 28, 4)                  # le giunture fra un anello e l'altro
+    _rect(m, 8, 35, 23, 36, 4)
+    _ell(m, 23, 17, 16, 15, 2)                  # testa
+    _ell(m, 23, 12, 13, 8, 3)                   # cocuzzolo in luce
+    if not open_pose:
+        _rect(m, 11, 19, 23, 22, 6)             # bocca chiusa: una fessura
+        _rect(m, 13, 9, 17, 13, 6)              # occhio
+    else:
+        _ell(m, 23, 21, 13, 12, 6)              # bocca spalancata
+        for x in (12, 17, 22):                  # zanne
+            _rect(m, x, 11, x + 2, 15, 1)
+            _rect(m, x, 28, x + 2, 32, 1)
+        _rect(m, 12, 6, 16, 10, 6)              # occhio strizzato
+    return _mirror(m)
+
+
+def regina(open_pose):
+    """La Regina della notte: un pipistrello grande come il nano è alto. In
+    volo non la si prende; quando si posa a riprendere fiato, sì."""
+    m = _blank(BOSS_SIZE, BOSS_SIZE)
+    if not open_pose:
+        _wedge(m, 0, 17, 6, 20, 17, 34, 2)      # ala aperta
+        _wedge(m, 0, 17, 16, 21, 26, 34, 4)     # la membrana sotto, più scura
+        _rect(m, 0, 5, 3, 20, 2)                # la punta dell'ala in alto
+    else:
+        _wedge(m, 6, 17, 18, 30, 15, 40, 2)     # ala chiusa attorno al corpo
+        _wedge(m, 8, 17, 26, 34, 24, 40, 4)
+    _ell(m, 23, 28, 10, 13, 2)                  # corpo
+    _ell(m, 23, 18, 8, 8, 2)                    # testa
+    _rect(m, 15, 6, 18, 13, 2)                  # orecchio
+    _rect(m, 17, 16, 21, 19, 5)                 # occhio acceso
+    _rect(m, 19, 24, 21, 27, 1)                 # zanna
+    if open_pose:
+        _rect(m, 17, 17, 21, 18, 4)             # occhio socchiuso: è a terra
+    return _mirror(m)
+
+
+# chiave -> colore, per ogni mostro; 0 è il vuoto, il contorno lo mette il
+# codice. La tavolozza è quella scritta accanto al nome.
+BOSSES = [
+    ("golem", 1, golem, {1: (255, 255, 255), 2: (150, 110, 90),
+                         3: (205, 170, 150), 4: (105, 70, 45),
+                         5: (235, 70, 70), 6: (0, 0, 0)}),
+    ("verme", 2, verme, {1: (255, 255, 255), 2: (200, 90, 230),
+                         3: (245, 170, 255), 4: (150, 60, 180),
+                         5: (255, 255, 255), 6: (36, 36, 72)}),
+    ("regina", 1, regina, {1: (255, 255, 255), 2: (80, 45, 75),
+                           3: (140, 90, 130), 4: (45, 25, 45),
+                           5: (235, 70, 70), 6: (0, 0, 0)}),
+]
+
+
 def wooden(img):
     out = img.copy()
     px = out.load()
@@ -647,6 +794,24 @@ def main():
         "................",
     ], STEEL, 2))
 
+    # ---- i mostri: metà sinistra, due pose, un banco per uno
+    boss_banks = []
+    for _bname, bpal, bdraw, bkeys in BOSSES:
+        b = Bank()
+        conv = {k: nearest(bpal, c) for k, c in bkeys.items()}
+        conv[9] = nearest(bpal, (0, 0, 0) if bpal == 1 else (36, 36, 72))
+        for pose in (0, 1):
+            keyed = outlined(bdraw(pose), 9)
+            flat = bytearray(BOSS_SIZE * BOSS_SIZE)
+            for y in range(BOSS_SIZE):
+                for x in range(BOSS_SIZE):
+                    flat[y * BOSS_SIZE + x] = conv.get(keyed[y][x], 0)
+            # due sprite da 24x24 impilati: il VDP non ne fa di più alti
+            b.block(flat, BOSS_SIZE, BOSS_SIZE, 0, 0, 3, 3, order="col")
+            b.block(flat, BOSS_SIZE, BOSS_SIZE, 0, 3, 3, 3, order="col")
+        assert len(b.tiles) == 36
+        boss_banks.append(b)
+
     # Il nastro trasportatore: quattro fotogrammi della stessa cella da 16x16.
     # In memoria video ne sta uno solo — gli altri tre arrivano in DMA sopra
     # allo stesso posto, così la tavola dei nomi non si tocca mai.
@@ -971,6 +1136,8 @@ def main():
             words = [int.from_bytes(t[i:i + 4], "big") for i in range(0, 32, 4)]
             f.write("    " + " ".join(f"0x{v:08X}," for v in words) + "\n")
         f.write("};\n\n")
+        f.write("const u8 boss_pal[%d] = { %s };\n\n" % (
+            len(BOSSES), ", ".join(str(p) for _n, p, _d, _k in BOSSES)))
 
         flat = [v for cell in terrain for v in cell]
         f.write(carr("terrain_cells", flat) + "\n\n")
@@ -998,6 +1165,16 @@ def main():
             f.write(f"    {{  /* {tname} */\n")
             for i in range(0, len(m), 16):
                 f.write("    " + " ".join(f"0x{v:04X}," for v in m[i:i + 16]) + "\n")
+            f.write("    },\n")
+        f.write("};\n\n")
+
+        # I mostri, alla stessa maniera: uno per volta nello stesso posto
+        f.write(f"const u32 boss_tiles[{len(BOSSES)}][{36 * 8}] = {{\n")
+        for (bname, _p, _d, _k), b in zip(BOSSES, boss_banks):
+            f.write(f"    {{  /* {bname} */\n")
+            for t in b.tiles:
+                words = [int.from_bytes(t[i:i + 4], "big") for i in range(0, 32, 4)]
+                f.write("    " + " ".join(f"0x{v:08X}," for v in words) + "\n")
             f.write("    },\n")
         f.write("};\n\n")
 
@@ -1036,6 +1213,12 @@ def main():
         f.write(f"#define TILE_SKY       {len(bank.tiles)}   /* dove si posa il cielo di turno */\n")
         f.write(f"extern const u32 sky_tiles[THEME_COUNT][{sky_room * 8}];\n")
         f.write("extern const u16 sky_map[THEME_COUNT][2048];   /* 64x32 celle */\n")
+        f.write(f"#define BOSS_COUNT     {len(BOSSES)}\n")
+        f.write("#define BOSS_TILES     36   /* due pose x due sprite da 24x24 */\n")
+        f.write(f"#define TILE_BOSS      {len(bank.tiles) + sky_room}   /* dove si posa il mostro di turno */\n")
+        f.write("extern const u32 boss_tiles[BOSS_COUNT][36 * 8];\n")
+        f.write("/* tavolozza di ogni mostro: il golem e la regina stanno con il nano */\n")
+        f.write("extern const u8 boss_pal[BOSS_COUNT];\n")
         f.write("extern const u16 logo_map[];        /* 32x8 celle */\n")
         f.write("extern const u16 logo_map_en[];     /* lo stesso, in inglese */\n")
         f.write("extern const u16 icon_cells[];      /* 4 icone x 4 disegni */\n")
@@ -1085,8 +1268,8 @@ def main():
                     px[x, y] = palettes[pal][v - 1]
         prev.save(os.path.join(PREVIEW, name + ".png"))
 
-    print(f"disegni: {len(bank.tiles)} + {sky_room} di cielo = "
-          f"{len(bank.tiles) + sky_room} su 1472 disponibili")
+    print(f"disegni: {len(bank.tiles)} + {sky_room} di cielo + 36 di mostro = "
+          f"{len(bank.tiles) + sky_room + 36} su 1472 disponibili")
     for (tname, _a, _b), b in zip(THEMES, sky_banks):
         print(f"  cielo {tname}: {len(b.tiles)} disegni")
     for p in range(4):

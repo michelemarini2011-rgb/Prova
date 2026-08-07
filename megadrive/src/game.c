@@ -64,6 +64,7 @@ static u8  pal_dirty;
    spiritelli restano quelli: se cambiassero anche loro non si
    riconoscerebbe più niente, e il buio non è un filtro sulla lente. */
 static u8 theme_now = 0xFF;      /* l'aria caricata in memoria video */
+static u8 boss_now = 0xFF;       /* e il mostro */
 static u8 screen_on;             /* per non accendere lo schermo prima del tempo */
 
 /* Il cielo di turno. I quattro disegni non ci stanno tutti insieme — sono
@@ -85,6 +86,17 @@ static void sky_upload(u8 t)
         }
         vdp_map_row(VRAM_PLANE_B, i, line, 64, 0);
     }
+    if (screen_on) vdp_display(1);
+}
+
+/* Il mostro di turno, con lo stesso patto del cielo: uno alla volta, sempre
+   nello stesso pezzo di memoria video, e si ricarica a schermo nero. */
+static void boss_upload(u8 kind)
+{
+    if (kind == BOSS_NONE || kind == boss_now) return;
+    boss_now = kind;
+    if (screen_on) vdp_display(0);
+    vdp_load_tiles(TILE_BOSS, boss_tiles[kind - 1], BOSS_TILES);
     if (screen_on) vdp_display(1);
 }
 
@@ -201,6 +213,24 @@ void particles_draw(void)
 
 /* -------------------------------------------------------------- eventi */
 
+/* Un colpo andato a segno sul mostro. Il rinculo serve a due cose: si vede che
+   è entrato, e impedisce di scaricargli addosso tre martellate nello stesso
+   momento di scoperto — una per volta, poi si ricomincia. */
+static void boss_hit(void)
+{
+    boss.hurt = BOSS_HURT;
+    particles_burst(boss.x, boss.y, 1, 8, VEL(220));
+    sfx_play(SFX_STUN);
+    if (--boss.hp == 0) {
+        boss.phase = BP_GONE;
+        game.boxed = 1;
+        hud_dirty = 1;
+        particles_burst(boss.x, boss.y, 0, 10, VEL(260));
+        particles_ring(boss.x, boss.y, 8);
+        sfx_play(SFX_BOX);
+    }
+}
+
 void game_on_jump(void)
 {
     sfx_play(SFX_JUMP);
@@ -271,6 +301,22 @@ void game_on_hammer(fix px, fix py)
         if (dx > SHOCK_RX || dy > SHOCK_RY) continue;
         if ((TOI(b->x) < ix) == (b->vx > 0)) b->vx = -b->vx;
         particles_burst(b->x, b->y, 1, 2, VEL(120));
+    }
+
+    /* Il mostro: solo quando è scoperto. Fuori da quel momento la martellata
+       non serve a niente, e deve vedersi che non serve — le scintille che
+       rimbalzano sono le stesse dell'elmo. */
+    if (boss.kind && boss.phase != BP_GONE) {
+        s16 dx = TOI(boss.x) - ix, dy = TOI(boss.y) - iy;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if (dx <= SHOCK_RX + BOSS_RX && dy <= SHOCK_RY + BOSS_RY) {
+            if (boss.phase == BP_OPEN && !boss.hurt) boss_hit();
+            else if (boss.phase != BP_MOVE || boss.kind != BOSS_WORM) {
+                particles_burst(boss.x, boss.y, 1, 3, VEL(140));
+                sfx_play(SFX_FREE);
+            }
+        }
     }
 
     for (i = 0; i < imp_count; i++) {
@@ -447,6 +493,73 @@ static void check_bats(void)
     }
 }
 
+/* Il mostro addosso costa un cuore, come uno spiritello: è grosso, ma non è
+   una trappola mortale. Quando è scoperto fa male lo stesso — bisogna
+   avvicinarsi sapendo dove mettersi, non solo quando. */
+static void check_boss(void)
+{
+    s16 nx, ny, dx, dy;
+    if (!boss.kind || boss.phase == BP_GONE || boss.hurt) return;
+    if (dwarf.invuln) return;
+    nx = TOI(boss.x);
+    ny = TOI(boss.y);
+    dx = (s16)(nx - (TOI(dwarf.x) + DW_W / 2));
+    dy = (s16)(ny - (TOI(dwarf.y) + DW_H / 2));
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+    if (dx > BOSS_RX + DW_W / 2 || dy > BOSS_RY + DW_H / 2) return;
+    dwarf_hurt(boss.x);
+    game.hearts--;
+    hud_dirty = 1;
+    sfx_play(SFX_HURT);
+    particles_burst(dwarf.x + FIX(DW_W / 2), dwarf.y + FIX(DW_H / 2), 1, 5, VEL(160));
+    if (game.hearts == 0) game_lose(TXT_BOSS_LOST);
+}
+
+/* La sberla del Golem corre lungo il terreno: chi ha i piedi per terra la
+   prende, chi è per aria no. È l'unico colpo che si schiva saltando, ed è il
+   motivo per cui il salto serve ancora quando l'avversario è uno solo. */
+static void check_slam(void)
+{
+    s16 dx;
+    if (!boss.slam) return;
+    boss.slam = 0;
+    particles_ring(boss.x, boss.y + FIX(BOSS_RY), 8);
+    sfx_play(SFX_HAMMER);
+    if (dwarf.invuln || !dwarf.on_ground) return;
+    dx = (s16)(TOI(dwarf.x) + DW_W / 2 - TOI(boss.x));
+    if (dx < 0) dx = -dx;
+    if (dx > BOSS_SLAM) return;
+    dwarf_hurt(boss.x);
+    game.hearts--;
+    hud_dirty = 1;
+    sfx_play(SFX_HURT);
+    if (game.hearts == 0) game_lose(TXT_BOSS_LOST);
+}
+
+/* Gli sputi: costano un cuore come le scintille che girano. */
+static void check_shots(void)
+{
+    u8 i;
+    if (dwarf.invuln) return;
+    for (i = 0; i < shot_count; i++) {
+        Shot *s = &shots[i];
+        s16 dx = (s16)(TOI(s->x) - (TOI(dwarf.x) + DW_W / 2));
+        s16 dy = (s16)(TOI(s->y) - (TOI(dwarf.y) + DW_H / 2));
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if (dx > SHOT_R + DW_W / 2 || dy > SHOT_R + DW_H / 2) continue;
+        dwarf_hurt(s->x);
+        game.hearts--;
+        hud_dirty = 1;
+        sfx_play(SFX_HURT);
+        particles_burst(s->x, s->y, 1, 4, VEL(150));
+        shots[i] = shots[--shot_count];
+        if (game.hearts == 0) game_lose(TXT_BURNT);
+        return;
+    }
+}
+
 /* Le punte non perdonano: un solo contatto e la cava ricomincia. */
 static void check_spikes(void)
 {
@@ -539,6 +652,8 @@ static void update_play(void)
     for (i = 0; i < plat_count; i++) plat_update(&plats[i]);
     for (i = 0; i < orbit_count; i++) orbit_update(&orbits[i]);
     for (i = 0; i < bat_count; i++) bat_update(&bats[i]);
+    boss_update();
+    shots_update();
     dwarf_update();
     for (i = 0; i < block_count; i++) block_update(&blocks[i]);
     for (i = 0; i < imp_count; i++)
@@ -551,6 +666,12 @@ static void update_play(void)
     check_orbits();
     if (game.state != ST_PLAY) return;
     check_bats();
+    if (game.state != ST_PLAY) return;
+    check_slam();
+    if (game.state != ST_PLAY) return;
+    check_shots();
+    if (game.state != ST_PLAY) return;
+    check_boss();
     if (game.state != ST_PLAY) return;
     /* la pestata sull'elmo vale per questo quadro: niente contatto */
     if (!check_stomp()) check_contact();
@@ -718,9 +839,13 @@ static void draw_card(void)
                   (u8)(game.index >= 9 ? 2 : 1));
         text_center(VRAM_WINDOW, 10, arena->name, 1);
         /* il conto degli spiritelli va sotto l'ultima riga del suggerimento,
-           che a volte sono tre e a volte quattro */
-        label_num((u16)(14 + text_wrap(VRAM_WINDOW, 13, arena->hint, 1, 34) * 2),
-                  TXT_IMPS_TO_BOX, game.total, 1);
+           che a volte sono tre e a volte quattro. Nella cava del mostro non
+           c'è niente da contare: c'è lui, e basta dirlo. */
+        {
+            u16 r = (u16)(14 + text_wrap(VRAM_WINDOW, 13, arena->hint, 1, 34) * 2);
+            if (arena->boss) text_center(VRAM_WINDOW, r, TXT_ONE_MONSTER, 1);
+            else label_num(r, TXT_IMPS_TO_BOX, game.total, 1);
+        }
         break;
     case ST_FINALE:
         panel(6, 16);
@@ -776,7 +901,10 @@ static void load_arena(u8 index)
 
     arena_load(index);
     game.index = index;
-    set_theme((u8)(index >> 2));        /* quattro cave per aria */
+    /* Cinque cave per aria: quattro normali e il mostro che le chiude. */
+    set_theme((u8)(index / 5));
+    boss_upload(arena->boss);
+    boss_reset();
     dwarf_reset();
     for (i = 0; i < imp_count; i++) imp_reset(&imps[i]);
     for (i = 0; i < block_count; i++) {
@@ -786,7 +914,10 @@ static void load_arena(u8 index)
         blocks[i].on_ground = 0;
         blocks[i].rider = -1;
     }
-    game.total = imp_count;
+    /* Nella cava del mostro non c'è niente da inscatolare: il conto è uno solo
+       e si chiude quando la bestia è finita. Il pannello dice 0/1, che è
+       esattamente quello che c'è da fare. */
+    game.total = boss.kind ? 1 : imp_count;
     game.boxed = 0;
     game.hearts = HEARTS;
     game.portal_open = 0;
@@ -919,6 +1050,52 @@ static void draw_imps(void)
     }
 }
 
+/* Il mostro: in memoria video c'è solo la sua metà sinistra, e la destra è
+   quella ribaltata dal VDP. Quattro sprite da 24x24 perché più alti di così
+   non se ne fanno. Sopra la testa la vita che gli resta, con la stessa
+   barretta del torpore degli spiritelli — una cosa in meno da imparare. */
+static void draw_boss(void)
+{
+    s16 sx, sy;
+    u16 base;
+    u8  pal, c;
+
+    if (!boss.kind || boss.phase == BP_GONE) return;
+    if (boss.kind == BOSS_WORM && boss.phase == BP_MOVE) return;  /* è sotto */
+    if (boss.hurt && (boss.hurt & 4)) return;                     /* lampeggia */
+
+    pal = boss_pal[boss.kind - 1];
+    base = (u16)(TILE_BOSS + boss.pose * 18);
+    sx = (s16)(TOI(boss.x) - BOSS_HALF - game.cam_x);
+    sy = (s16)(TOI(boss.y) - BOSS_HALF - game.cam_y + HUD_H);
+    sprite_add(sx, sy, 3, 3, TILE_ATTR(base, pal, 0, 0, 0));
+    sprite_add(sx, (s16)(sy + 24), 3, 3, TILE_ATTR(base + 9, pal, 0, 0, 0));
+    sprite_add((s16)(sx + 24), sy, 3, 3, TILE_ATTR(base, pal, 0, 1, 0));
+    sprite_add((s16)(sx + 24), (s16)(sy + 24), 3, 3,
+               TILE_ATTR(base + 9, pal, 0, 1, 0));
+
+    /* la vita: quattro caselle da otto tacche, riempite in proporzione */
+    for (c = 0; c < 4; c++) {
+        s16 fill = (s16)(((s16)boss.hp * 32) / boss.hp_max) - (s16)(c * 8);
+        if (fill < 0) fill = 0;
+        if (fill > 8) fill = 8;
+        sprite_add((s16)(sx + 8 + c * 8), (s16)(sy - 10), 1, 1,
+                   TILE_ATTR(TILE_BAR + fill, 1, 0, 0, 0));
+    }
+}
+
+/* Gli sputi: la stessa palla di fuoco delle scintille che girano. */
+static void draw_shots(void)
+{
+    u8 i;
+    for (i = 0; i < shot_count; i++) {
+        sprite_add((s16)(TOI(shots[i].x) - 8 - game.cam_x),
+                   (s16)(TOI(shots[i].y) - 8 - game.cam_y + HUD_H),
+                   2, 2, TILE_ATTR(TILE_FIRE + ((game.time >> 2) & 1) * 4,
+                                   1, 0, 0, 0));
+    }
+}
+
 static void draw_blocks(void)
 {
     u8 i;
@@ -1038,7 +1215,7 @@ static void draw_crates(void)
 
 static void draw_markers(void)
 {
-    s16 targets[2][2];
+    s16 targets[3][2];
     u8 n = 0, i;
     /* un respiro lento, così l'occhio la trova senza che lampeggi */
     s16 bob = (s16)((sin_t((u8)(game.time * 3)) * 3) >> 8);
@@ -1046,6 +1223,14 @@ static void draw_markers(void)
     if (dwarf.carrying >= 0 && has_machine) {
         targets[n][0] = intake_x;
         targets[n][1] = intake_y;
+        n++;
+    }
+    /* il mostro fuori vista: senza freccia lo si cerca a caso, e il Verme
+       spunta apposta lontano da dove sei */
+    if (boss.kind && boss.phase != BP_GONE &&
+        !(boss.kind == BOSS_WORM && boss.phase == BP_MOVE)) {
+        targets[n][0] = TOI(boss.x);
+        targets[n][1] = TOI(boss.y);
         n++;
     }
     if (game.portal_open) {
@@ -1135,6 +1320,8 @@ static void draw_world_sprites(u8 mode, u16 t)
     draw_blocks();
     draw_bats();
     draw_orbits();
+    draw_boss();
+    draw_shots();
     draw_imps();
     if (mode == DWARF_PLAY) draw_dwarf();
     else if (mode == DWARF_PORTAL && t >= SPIRAL_FRONT) draw_dwarf_portal(t);

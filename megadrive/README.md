@@ -5,7 +5,9 @@ Drive / Genesis: stessi movimenti, stessa regia, scritta in C e assembly 68000
 e compilata in una ROM da 512 KB. Le quattro cave dell'originale ci sono tutte,
 più nove nuove che introducono una cosa per volta — ascensori, assi a tempo,
 assi marce, pipistrelli, nastro trasportatore, scintille, talpe, elmi,
-carrello da miniera — infilate fra quelle vecchie in ordine di difficoltà.
+carrello da miniera — infilate fra quelle vecchie in ordine di difficoltà, e
+tre cave del mostro che chiudono un gruppo di quattro ciascuna: sedici in
+tutto.
 
 ## Giocare
 
@@ -52,7 +54,26 @@ Due cose da guardare mentre si gioca: la **barra sopra la testa** dello
 spiritello stordito dice quanto manca prima che si svegli (se lo si sta
 trasportando, quanto manca prima che scappi), e la **freccia sul bordo dello
 schermo** punta verso il macchinario mentre si trasporta, verso il portale
-quando si è aperto.
+quando si è aperto, verso il mostro quando ce n'è uno.
+
+### I mostri
+
+Ogni quinta cava non c'è niente da inscatolare: c'è **una bestia sola**, con la
+sua vita segnata dalla barra sopra la testa. Il verbo resta il martello, ma il
+mostro si scopre soltanto a momenti, e fuori da quei momenti l'onda d'urto gli
+rimbalza addosso — come sull'elmo. Riconoscere quando è aperto, e trovarsi lì
+in quel momento, è tutto il gioco.
+
+- **Il Golem di pietra** (cava 5) cammina verso di te e ogni tanto ti salta
+  addosso. Quando ricade sbatte per terra, e la sberla corre lungo il suolo:
+  chi ha i piedi a terra la prende, chi è per aria no. Dopo resta accasciato
+  quasi due secondi, ed è lì che si martella. Quattro colpi;
+- **Il Verme delle sabbie** (cava 10) sta sotto e si affaccia dalla buca più
+  vicina a te — bisogna corrergli incontro, non aspettarlo. Fuori è sempre
+  scoperto, ma sputa e sta fuori poco. Cinque colpi;
+- **La Regina della notte** (cava 15) vola e lascia cadere le scintille; ogni
+  tanto piomba giù e resta a terra a riprendere fiato. In volo non la prendi, e
+  la sosta dura poco più di un secondo. Sei colpi.
 
 ### Scegliere la cava
 
@@ -68,8 +89,9 @@ dire niente.
 
 ### Quattro arie
 
-Ogni quattro cave cambia l'ora del giorno: **giorno** (1-4), **tramonto**
-(5-8), **notte** (9-12), **alba** (la tredicesima). Cambiano due cose insieme.
+Ogni cinque cave cambia l'ora del giorno — quattro normali più quella del
+mostro che chiude il gruppo: **giorno** (1-5), **tramonto** (6-10), **notte**
+(11-15), **alba** (la sedicesima). Cambiano due cose insieme.
 
 Le **tavolozze** del terreno e del cielo sono ricalcolate da
 `tools/md_assets.py` con due formule diverse: scaldare il cielo al tramonto e
@@ -137,7 +159,7 @@ src/psg.c         effetti sonori sul generatore di suoni
 src/text.c        scritte (un disegno da 8x8 per lettera)
 src/strings.h     tutte le frasi, in italiano e in inglese
 src/arena.c       mappa della cava, disegno del terreno, scorrimento verticale
-src/entities.c    nano, spiritelli, blocchi irti, assi mobili
+src/entities.c    nano, spiritelli, blocchi irti, assi mobili, mostri
 src/game.c        stati, onda d'urto, macchinario, portale, pannello, sprite
 src/fault.c       schermata di errore se il processore inciampa
 res/gfx.*         disegni e tavolozze (generati)
@@ -246,11 +268,37 @@ tutto è codice e mappe.
   remata. Ci si può salire sopra e spingersi da soli, e il martello smette di
   essere solo un'arma.
 
+### Un mostro per aria
+
+I tre mostri sono grandi 48x48, cioè tre volte il nano: dodici celle per
+disegno. Tre bestie per due pose l'una farebbero centosette celle di memoria
+video, e non ci stanno. Se ne tengono due cose.
+
+La prima è che **sono simmetrici**: in memoria video ci va solo la metà
+sinistra, e la destra è quella ribaltata dal VDP. Metà del costo, e una
+creatura che ti guarda in faccia invece di stare di profilo — per un avversario
+piantato davanti è anche meglio. La seconda è che, come i cieli, ce n'è **uno
+solo alla volta**: il pezzo di memoria è sempre quello e si riscrive quando si
+carica la cava, che è già a schermo nero. Restano trentasei celle in tutto.
+
+Le due pose sono il minimo che serve al gioco: quella in cui si muove e non lo
+tocchi, e quella in cui è scoperto. Devono distinguersi da lontano, o giocare
+diventa indovinare — il Golem si accascia, il Verme spalanca la bocca, la
+Regina chiude le ali.
+
+Il resto è una macchina a stati con tre fasi uguali per tutti e tre — si muove,
+sta per arrivare qualcosa, è scoperto — e dentro ognuna il comportamento della
+bestia. Il colpo andato a segno dà un rinculo di mezzo secondo in cui il mostro
+lampeggia e non si può ricolpire: si vede che è entrato, e non gli si scarica
+addosso tre martellate nello stesso momento di scoperto.
+
 Le mappe stanno in `tools/arenas.json` e si guardano con
 `tools/preview_levels.py`, che le disegna tutte in fila e controlla quello che
 il gioco dà per scontato: larghezza trenta, un solo punto di partenza, un solo
 portale, il macchinario che occupa davvero quattro celle per quattro, e i tetti
-delle strutture (otto spiritelli, sei blocchi, sei assi, sei scintille).
+delle strutture (otto spiritelli, sei blocchi, sei assi, sei scintille). Nelle
+cave del mostro il macchinario non c'è — non si inscatola niente — e al suo
+posto si contano le tane, da una a quattro.
 
 Quello che il disegno **non** dice è se la cava si sale. Il nano salta tre celle
 e ne copre quattro di lato: se la prima asse è più su, dal punto di partenza non
