@@ -218,3 +218,5 @@ td.pct { font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) { .r-flow.animate { transition: none; } }
 @media print { body { display: none; } }
+.linkish { border: 0; background: none; padding: 4px; color: var(--accent-2); text-decoration: underline; cursor: pointer; font-size: 15px; }
+code { background: #ece6d8; padding: 1px 5px; border-radius: 4px; font-size: .9em; }

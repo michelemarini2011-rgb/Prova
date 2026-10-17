@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// Regole di sicurezza dell'archivio Firestore.
+// IMPORTANTE: sostituisci tua-email@example.com con la tua email (la stessa
+// messa in public/firebase-config.js). Puoi indicarne più d'una:
+//   ['tua-email@example.com', 'altra@example.com']
+// Per ragioni di sicurezza l'accesso da amministratore funziona solo dopo aver
+// confermato l'email tramite il link che Firebase invia alla registrazione.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in ['tua-email@example.com'];
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function text(value, min, max) {
+      return value is string && value.size() >= min && value.size() <= max;
+    }
+
+    // Dati pubblici del libro: chiunque li vede, solo l'autore li cambia.
+    match /book/meta {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Testo dei capitoli: solo per utenti registrati.
+    match /chapters/{chapterId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'company', 'consent', 'createdAt', 'lastSeenAt'])
+        && text(request.resource.data.name, 2, 80)
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role in ['editore', 'agente', 'scout', 'lettore', 'altro']
+        && text(request.resource.data.company, 0, 120)
+        && request.resource.data.consent == true
+        && text(request.resource.data.createdAt, 10, 40)
+        && text(request.resource.data.lastSeenAt, 10, 40);
+      // L'utente può aggiornare solo la data dell'ultimo accesso.
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeenAt'])
+        && text(request.resource.data.lastSeenAt, 10, 40);
+      allow delete: if isAdmin();
+    }
+
+    match /progress/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['chapters', 'updatedAt'])
+        && request.resource.data.chapters is map
+        && request.resource.data.chapters.size() <= 200
+        && text(request.resource.data.updatedAt, 10, 40);
+      allow delete: if isAdmin();
+    }
+
+    match /messages/{messageId} {
+      allow read, delete: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'message', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && text(request.resource.data.message, 5, 4000)
+        && text(request.resource.data.createdAt, 10, 40);
+    }
+  }
+}

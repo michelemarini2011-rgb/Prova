@@ -1,4 +1,3 @@
-'use strict';
 // Convertitore Markdown ridotto, pensato per testi narrativi:
 //   # Titolo / ## Sottotitolo   →  intestazioni
 //   *** oppure * * *            →  stacco di scena
@@ -7,7 +6,7 @@
 //   righe vuote                 →  separano i paragrafi
 // Tutto l'HTML presente nel testo viene neutralizzato.
 
-function escapeHtml(s) {
+export function escapeHtml(s) {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -25,7 +24,7 @@ function inline(s) {
     .replace(/\*(.+?)\*/g, '<em>$1</em>');
 }
 
-function render(markdown) {
+export function render(markdown) {
   const blocks = markdown.replace(/\r\n?/g, '\n').split(/\n\s*\n/);
   const html = [];
   for (const raw of blocks) {
@@ -47,8 +46,6 @@ function render(markdown) {
   return html.join('\n');
 }
 
-function countWords(markdown) {
+export function countWords(markdown) {
   return (markdown.match(/[\p{L}\p{N}’']+/gu) || []).length;
 }
-
-module.exports = { render, countWords, escapeHtml };

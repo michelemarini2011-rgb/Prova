@@ -1,6 +1,8 @@
-'use strict';
 // Applicazione a pagina singola: vetrina del libro, registrazione/accesso,
 // libreria, lettore paginato in stile ebook e pannello statistiche per l'autore.
+// Tutti i dati passano da data.js (Firebase).
+
+import * as data from './data.js';
 
 (() => {
   const app = document.getElementById('app');
@@ -28,23 +30,6 @@
       }
     },
   };
-
-  async function api(method, url, body, opts = {}) {
-    const res = await fetch(url, {
-      method,
-      credentials: 'same-origin',
-      keepalive: !!opts.keepalive,
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.error || 'Si è verificato un errore. Riprova.');
-      err.status = res.status;
-      throw err;
-    }
-    return data;
-  }
 
   function toast(text) {
     const el = document.createElement('div');
@@ -92,7 +77,7 @@
          <button class="btn ghost small" data-action="logout">Esci</button>`
       : `<a class="btn ghost small" href="#/accedi">Accedi</a>`;
     return `<header class="topbar">
-      <a class="brand" href="#/"><img src="/icon.svg" alt=""><span>${esc(state.book.title)}</span></a>
+      <a class="brand" href="#/"><img src="icon.svg" alt=""><span>${esc(state.book.title)}</span></a>
       <nav>${right}</nav>
     </header>`;
   }
@@ -130,6 +115,17 @@
   function viewHome() {
     const b = state.book;
     setTitle();
+    if (state.bookMissing) {
+      app.innerHTML = `<div class="page">${topbar()}
+        <div class="auth"><div class="card">
+          <h1 style="font-family:var(--serif);margin-top:0">Anteprima in preparazione</h1>
+          <p>I capitoli non sono ancora stati pubblicati. Torna a trovarci presto!</p>
+          ${state.user?.isAdmin
+            ? '<p><a class="btn" href="#/admin">Carica i capitoli</a></p>'
+            : '<p class="empty">Sei l\'autore? <a href="#/accedi">Accedi</a> e carica i capitoli dal pannello Statistiche.</p>'}
+        </div></div></div>`;
+      return;
+    }
     const last = state.user && lastReadChapter();
     const cta = state.user
       ? `<a class="btn" href="#/leggi/${esc((last?.ch || b.chapters[0]).id)}">${last ? 'Continua a leggere' : 'Inizia a leggere'}</a>
@@ -214,6 +210,7 @@
         <label class="check"><input type="checkbox" name="consent" required>
           <span>Ho letto l'<a href="#/privacy" target="_blank">informativa privacy</a> e acconsento al trattamento dei miei dati per accedere all'anteprima ed essere eventualmente ricontattato dall'autore. Mi impegno a non copiare né diffondere il testo.</span></label>` : ''}
         <button class="btn block" type="submit">${isReg ? 'Registrati e inizia a leggere' : 'Accedi'}</button>
+        ${isReg ? '' : '<p class="switch"><button type="button" class="linkish" data-action="reset">Password dimenticata?</button></p>'}
         <p class="switch">${isReg
           ? 'Hai già un account? <a href="#/accedi">Accedi</a>'
           : 'Non hai un account? <a href="#/registrati">Registrati</a>'}</p>
@@ -232,7 +229,7 @@
         <p>Il titolare del trattamento è ${esc(b.author)}${b.contactEmail ? ` (<a href="mailto:${esc(b.contactEmail)}">${esc(b.contactEmail)}</a>)` : ''}.</p>
         <p>I dati raccolti con la registrazione (nome, email, ruolo, casa editrice o agenzia) e l'avanzamento della lettura sono usati esclusivamente per consentire l'accesso all'anteprima del libro e per ricontattarti in merito alla sua pubblicazione. Non vengono ceduti a terzi.</p>
         <p>Puoi chiedere in qualsiasi momento l'accesso, la rettifica o la cancellazione dei tuoi dati scrivendo al titolare.</p>
-        <p>Il sito usa un unico cookie tecnico, necessario per mantenere l'accesso; le preferenze di lettura (dimensione del testo, tema) restano solo nel tuo browser.</p>
+        <p>I dati sono conservati tramite i servizi Google Firebase (Authentication e Cloud Firestore). Il sito non usa cookie di profilazione: per mantenere l'accesso e le preferenze di lettura usa solo la memoria locale del browser.</p>
         <p><a href="#/">← Torna al libro</a></p>
       </div>
     </div>`;
@@ -241,13 +238,27 @@
   async function viewAdmin() {
     setTitle('Statistiche');
     app.innerHTML = `<div class="page">${topbar()}<p class="empty">Caricamento statistiche…</p></div>`;
-    let s;
-    try {
-      s = await api('GET', '/api/admin/stats');
-    } catch (err) {
-      app.innerHTML = `<div class="page">${topbar()}<p class="error">${esc(err.message)}</p></div>`;
+    if (!state.user.emailVerified) {
+      app.innerHTML = `<div class="page">${topbar()}<div class="auth"><div class="card">
+        <h1 style="font-family:var(--serif);margin-top:0">Conferma la tua email</h1>
+        <p>Per sicurezza il pannello dell'autore si apre solo dopo aver confermato l'indirizzo
+        <b>${esc(state.user.email)}</b> con il link che ti abbiamo inviato (controlla anche lo spam).</p>
+        <div data-slot="msg"></div>
+        <div class="cta"><button class="btn" data-action="verified">Ho confermato</button>
+        <button class="btn ghost" data-action="resend">Invia di nuovo</button></div>
+      </div></div></div>`;
       return;
     }
+    let s;
+    try {
+      s = await data.loadAdminStats();
+    } catch (err) {
+      app.innerHTML = `<div class="page">${topbar()}<p class="error">${esc(data.errorMessage(err))}</p>
+        <p class="empty">Se l'errore è «Operazione non consentita», controlla di aver inserito la tua email in firestore.rules e di aver pubblicato le regole.</p>
+        ${uploadSection()}</div>`;
+      return;
+    }
+    adminStats = s;
     const pct = (v) => (v > 0 ? `${Math.round(v * 100)}%` : '—');
     app.innerHTML = `<div class="page">
       ${topbar()}
@@ -268,7 +279,7 @@
       <section class="section">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
           <h2 style="margin:0">Lettori</h2>
-          <a class="btn ghost small" href="/api/admin/export.csv">Scarica CSV</a>
+          <button class="btn ghost small" data-action="csv">Scarica CSV</button>
         </div>
         ${s.users.length ? `<div class="table-wrap"><table>
           <thead><tr><th>Nome</th><th>Ruolo</th><th>Casa editrice / agenzia</th><th>Email</th>
@@ -279,7 +290,45 @@
             <td>${fmtDate(u.lastSeenAt)}</td><td>${fmtDate(u.createdAt)}</td></tr>`).join('')}</tbody>
         </table></div>` : '<p class="empty">Ancora nessun registrato.</p>'}
       </section>
+      ${uploadSection()}
     </div>`;
+  }
+
+  let adminStats = null;
+
+  function uploadSection() {
+    return `<section class="section">
+      <h2>Contenuti del libro</h2>
+      <form class="card" data-form="upload">
+        <p style="margin-top:0;color:var(--muted)">Seleziona insieme il file <b>book.json</b> e tutti i file
+        dei capitoli (<b>.md</b>) della cartella <code>content</code>. Pubblicando, il libro online viene
+        sostituito con questi contenuti; i progressi dei lettori restano.</p>
+        <div data-slot="msg"></div>
+        <label class="field"><span>File</span><input type="file" name="files" multiple accept=".json,.md,.txt,text/markdown,application/json,text/plain"></label>
+        <button class="btn" type="submit">Pubblica i capitoli</button>
+      </form>
+    </section>`;
+  }
+
+  function downloadCsv(s) {
+    const header = ['Nome', 'Email', 'Ruolo', 'Casa editrice/Agenzia', 'Registrato', 'Ultimo accesso',
+      ...s.chapters.map((c) => c.title)];
+    const rows = s.users.map((u) => [u.name, u.email, ROLE_LABELS[u.role] || u.role, u.company, fmtDate(u.createdAt),
+      fmtDate(u.lastSeenAt), ...u.chapters.map((p) => `${Math.round(p * 100)}%`)]);
+    // Il prefisso ' impedisce che un valore venga interpretato come formula da Excel.
+    const cell = (v) => {
+      let t = String(v ?? '');
+      if (/^[=+\-@]/.test(t)) t = `'${t}`;
+      return `"${t.replace(/"/g, '""')}"`;
+    };
+    const csv = '\ufeff' + [header, ...rows].map((r) => r.map(cell).join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'lettori.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
   // ------------------------------------------------------------- lettore
@@ -293,7 +342,7 @@
 
   async function viewReader(chapterId, startAt = 'saved') {
     const b = state.book;
-    if (!b.chapters.some((c) => c.id === chapterId)) return go('#/libreria');
+    if (!b.chapters.some((c) => c.id === chapterId)) return go(state.bookMissing ? '#/' : '#/libreria');
 
     // Riutilizza il guscio del lettore se è già aperto (cambio capitolo).
     if (!reader) buildReaderShell();
@@ -305,15 +354,17 @@
 
     let ch;
     try {
-      ch = await api('GET', `/api/chapters/${encodeURIComponent(chapterId)}`);
+      ch = await data.getChapter(chapterId);
     } catch (err) {
-      if (err.status === 401) {
-        state.user = null;
-        return go('#/accedi');
-      }
-      toast(err.message);
+      toast(data.errorMessage(err));
       return;
     }
+    if (!ch) return go('#/libreria');
+    const pos = b.chapters.findIndex((c) => c.id === chapterId);
+    ch.index = pos;
+    ch.prev = b.chapters[pos - 1]?.id || null;
+    ch.next = b.chapters[pos + 1]?.id || null;
+    ch.isLast = !ch.next;
     if (token !== r.loadToken || reader !== r) return; // nel frattempo si è navigato altrove
 
     r.chapter = ch;
@@ -430,11 +481,18 @@
       const fraction = r.fraction();
       const now = new Date().toISOString();
       const prev = state.progress[chapterId] || { max: 0 };
-      state.progress[chapterId] = { ...prev, fraction, max: Math.max(prev.max || 0, fraction), updatedAt: now };
+      state.progress[chapterId] = {
+        fraction,
+        max: Math.max(prev.max || 0, fraction),
+        openedAt: prev.openedAt || now,
+        updatedAt: now,
+      };
       clearTimeout(r.saveTimer);
-      const send = () => api('PUT', '/api/progress', { chapterId, fraction }, { keepalive: immediate }).catch(() => {});
+      const entry = state.progress[chapterId];
+      const send = () => data.saveProgress(state.user.uid, chapterId, entry).catch(() => {});
+      // Salvataggio differito: si scrive una volta ogni qualche pagina, non a ogni tocco.
       if (immediate) send();
-      else r.saveTimer = setTimeout(send, 700);
+      else r.saveTimer = setTimeout(send, 2500);
     };
 
     r.next = () => {
@@ -641,41 +699,72 @@
     const fd = new FormData(form);
     const body = Object.fromEntries(fd.entries());
     if (kind === 'register') body.consent = fd.get('consent') === 'on';
+    const showError = (err) => (slot.innerHTML = `<p class="error">${esc(data.errorMessage(err))}</p>`);
 
     slot.innerHTML = '';
     btn.disabled = true;
     try {
-      if (kind === 'contact') {
-        await api('POST', '/api/contact', body);
+      if (kind === 'upload') {
+        const files = form.querySelector('input[type=file]').files;
+        if (!files.length) throw Object.assign(new Error(), { userMessage: 'Seleziona i file da pubblicare.' });
+        const chapters = await data.publishContent(files);
+        await loadBook();
+        slot.innerHTML = `<p class="success">Pubblicati ${chapters.length} capitoli: ${chapters.map((c) => esc(c.title)).join(', ')}.</p>`;
+      } else if (kind === 'contact') {
+        await data.sendMessage(state.user.uid, body.message);
         form.querySelector('textarea').value = '';
         slot.innerHTML = '<p class="success">Messaggio inviato. Grazie! Riceverai una risposta all\'indirizzo email con cui ti sei registrato.</p>';
       } else {
-        const { user } = await api('POST', kind === 'register' ? '/api/register' : '/api/login', body);
+        const user = kind === 'register' ? await data.register(body) : await data.login(body.email, body.password);
         state.user = user;
         await loadProgress();
         const next = sessionStorage.getItem('after-login');
         sessionStorage.removeItem('after-login');
-        go(next || (kind === 'register' ? `#/leggi/${state.book.chapters[0].id}` : '#/libreria'));
+        const first = state.book.chapters[0];
+        go(next || (kind === 'register' && first ? `#/leggi/${first.id}` : '#/libreria'));
       }
     } catch (err) {
-      slot.innerHTML = `<p class="error">${esc(err.message)}</p>`;
+      showError(err);
     } finally {
       btn.disabled = false;
     }
   });
 
   app.addEventListener('click', async (e) => {
-    if (e.target.closest('[data-action="logout"]')) {
-      await api('POST', '/api/logout').catch(() => {});
-      state.user = null;
-      state.progress = {};
-      go('#/');
+    const action = e.target.closest('[data-action]')?.dataset.action;
+    if (!action) return;
+    const slot = app.querySelector('[data-slot="msg"]');
+    const say = (html) => slot && (slot.innerHTML = html);
+    try {
+      if (action === 'logout') {
+        closeReader();
+        await data.logout();
+        state.user = null;
+        state.progress = {};
+        go('#/');
+      } else if (action === 'reset') {
+        const email = app.querySelector('input[name=email]').value.trim();
+        if (!email) return say('<p class="error">Scrivi la tua email qui sopra, poi premi di nuovo «Password dimenticata?».</p>');
+        await data.resetPassword(email);
+        say(`<p class="success">Se esiste un account per ${esc(email)}, riceverai un'email per scegliere una nuova password.</p>`);
+      } else if (action === 'resend') {
+        await data.resendVerification();
+        say('<p class="success">Email inviata di nuovo.</p>');
+      } else if (action === 'verified') {
+        state.user = await data.refreshUser();
+        if (state.user?.emailVerified) route();
+        else say('<p class="error">L\'email non risulta ancora confermata. Apri il link ricevuto e riprova.</p>');
+      } else if (action === 'csv' && adminStats) {
+        downloadCsv(adminStats);
+      }
+    } catch (err) {
+      say(`<p class="error">${esc(data.errorMessage(err))}</p>`);
     }
   });
 
   async function loadProgress() {
     try {
-      state.progress = (await api('GET', '/api/progress')).progress;
+      state.progress = await data.getProgress(state.user.uid);
     } catch {
       state.progress = {};
     }
@@ -701,6 +790,8 @@
       return go('#/registrati');
     }
     if ((section === 'accedi' || section === 'registrati') && state.user) return go('#/libreria');
+    if (state.bookMissing && (section === 'libreria' || section === 'leggi')) return go('#/');
+    if (section === 'admin' && !state.user.isAdmin) return go('#/');
 
     if (section !== 'leggi') closeReader();
     window.scrollTo(0, 0);
@@ -724,18 +815,55 @@
     }
   }
 
+  const EMPTY_BOOK = {
+    title: 'Anteprima del libro', subtitle: '', author: '', genre: '', tagline: '', synopsis: [],
+    aboutAuthor: '', contactEmail: '', endNote: '', chapters: [],
+  };
+
+  async function loadBook() {
+    const book = await data.getBook();
+    state.bookMissing = !book || !book.chapters?.length;
+    state.book = { ...EMPTY_BOOK, ...(book || {}) };
+  }
+
   async function init() {
+    if (!data.isConfigured) {
+      app.innerHTML = `<div class="page"><div class="auth"><div class="card">
+        <h1 style="font-family:var(--serif);margin-top:0">Quasi pronto</h1>
+        <p>Manca la configurazione di Firebase: apri <code>public/firebase-config.js</code> e incolla i dati del
+        tuo progetto, come spiegato nel file LEGGIMI/README.</p></div></div></div>`;
+      return;
+    }
     try {
-      const [book, me] = await Promise.all([api('GET', '/api/book'), api('GET', '/api/me')]);
-      state.book = book;
-      state.user = me.user;
-      if (state.user) await loadProgress();
+      await loadBook();
     } catch {
       app.innerHTML = '<div class="loading">Impossibile caricare il libro. Controlla la connessione e ricarica la pagina.</div>';
       return;
     }
-    window.addEventListener('hashchange', route);
-    route();
+    let started = false;
+    data.watchUser(async (user) => {
+      const changed = (state.user?.uid || null) !== (user?.uid || null);
+      // Stesso utente già impostato dal modulo di accesso/registrazione: nulla da fare.
+      if (started && !changed) return;
+      state.user = user;
+      if (user) {
+        if (changed) {
+          await loadProgress();
+          data.touchLastSeen(user.uid);
+        }
+      } else {
+        state.progress = {};
+      }
+      if (!started) {
+        started = true;
+        window.addEventListener('hashchange', route);
+        route();
+      } else if (!user && changed) {
+        // uscita (anche da un'altra scheda): si torna alla vetrina
+        closeReader();
+        go('#/');
+      }
+    });
   }
 
   init();

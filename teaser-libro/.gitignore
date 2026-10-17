@@ -1,2 +1,3 @@
-data/
+.firebase/
 node_modules/
+*.log

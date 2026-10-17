@@ -1,9 +1,9 @@
 {
   "name": "Anteprima del libro",
   "short_name": "Anteprima",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f7f3ea",
   "theme_color": "#16324a",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }
