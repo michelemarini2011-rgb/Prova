@@ -1,0 +1,21 @@
+{
+  "title": "Il custode delle maree",
+  "subtitle": "Romanzo",
+  "author": "Nome Cognome",
+  "genre": "Narrativa · Realismo magico",
+  "tagline": "Su un'isola dove il mare restituisce ciò che prende, una ragazza deve decidere cosa vale la pena ricordare.",
+  "synopsis": [
+    "Sull'isola di Sarve il mare ha una regola sola: tutto ciò che si porta via, prima o poi lo restituisce. Lettere, barche, a volte persone. Da tre generazioni la famiglia Lenti custodisce il registro delle restituzioni, annotando ogni oggetto che le maree depongono sulla spiaggia grande.",
+    "Quando il nonno muore lasciando il registro incompiuto, la diciassettenne Ilaria scopre che una pagina è stata strappata, e che il mare, da quel giorno, ha smesso di restituire."
+  ],
+  "aboutAuthor": "Qui va una breve biografia dell'autore: formazione, pubblicazioni precedenti, premi, e perché questa storia.",
+  "totalChapters": 24,
+  "totalWords": 92000,
+  "contactEmail": "autore@example.com",
+  "endNote": "Hai letto i primi capitoli de «Il custode delle maree». Il manoscritto completo (24 capitoli, circa 92.000 parole) è disponibile su richiesta per case editrici e agenti letterari.",
+  "chapters": [
+    { "id": "capitolo-1", "file": "01-la-spiaggia-grande.md", "title": "Capitolo 1", "subtitle": "La spiaggia grande" },
+    { "id": "capitolo-2", "file": "02-il-registro.md", "title": "Capitolo 2", "subtitle": "Il registro" },
+    { "id": "capitolo-3", "file": "03-la-pagina-mancante.md", "title": "Capitolo 3", "subtitle": "La pagina mancante" }
+  ]
+}
