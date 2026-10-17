@@ -1,22 +1,55 @@
 {
-  "hosting": {
-    "public": "public",
-    "ignore": ["**/.*"],
-    "headers": [
-      {
-        "source": "**",
-        "headers": [
-          { "key": "X-Content-Type-Options", "value": "nosniff" },
-          { "key": "X-Frame-Options", "value": "DENY" },
-          { "key": "Referrer-Policy", "value": "same-origin" }
-        ]
-      },
-      {
-        "source": "**/*.@(js|html)",
-        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
-      }
-    ]
-  },
+  "hosting": [
+    {
+      "public": "public",
+      "ignore": [
+        "**/.*"
+      ],
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "Referrer-Policy",
+              "value": "same-origin"
+            }
+          ]
+        },
+        {
+          "source": "**/*.@(js|html)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ],
+      "site": "michelemarini-libri"
+    },
+    {
+      "site": "non-e--cio--che-pensi",
+      "public": "public",
+      "ignore": [
+        "**"
+      ],
+      "redirects": [
+        {
+          "source": "**",
+          "destination": "https://michelemarini-libri.web.app",
+          "type": 301
+        }
+      ]
+    }
+  ],
   "firestore": {
     "rules": "firestore.rules"
   }

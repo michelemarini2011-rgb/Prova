@@ -79,6 +79,11 @@ npm run deploy    # pubblica il sito e le regole di sicurezza
 ```
 
 Alla fine compare l'indirizzo del sito, del tipo `https://anteprima-libro.web.app`.
+
+> **Questo progetto** è pubblicato su **https://michelemarini-libri.web.app**. Il vecchio
+> indirizzo `https://non-e--cio--che-pensi.web.app` reindirizza automaticamente al nuovo
+> (vedi i due siti in `firebase.json`). Se aggiungi un altro indirizzo, ricordati di
+> inserirlo anche in Authentication → Impostazioni → Domini autorizzati.
 Per ogni aggiornamento successivo basta ripetere `npm run deploy`.
 
 #### Strada B: senza installare nulla
