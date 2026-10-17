@@ -1,8 +1,8 @@
 {
   "title": "Non è ciò che pensi",
   "subtitle": "Romanzo",
-  "author": "",
-  "genre": "",
+  "author": "Michele Marini",
+  "genre": "Fantasy steampunk con venature investigative",
   "tagline": "",
   "synopsis": [
     "A Vyreth, città di vapore e ingranaggi, un ambasciatore alieno viene trovato morto in un bordello del quartiere più malfamato. Sembra una morte naturale, ma l'eccentrico investigatore Erasmus Wakkerty non ci crede.",
@@ -10,11 +10,11 @@
     "Tra navi che solcano le stelle, pirati senza scrupoli e creature che vivono nell'ombra, Wakkerty dovrà capire di chi fidarsi prima che il Velo cada.",
     "Perché niente, davvero niente, è ciò che pensi."
   ],
-  "aboutAuthor": "",
-  "totalChapters": null,
-  "totalWords": null,
-  "contactEmail": "",
-  "endNote": "",
+  "aboutAuthor": "Michele Marini lavora da anni nello sviluppo software, dove passa le giornate a risolvere enigmi fatti di codice. «Non è ciò che pensi» è il suo romanzo d'esordio e il primo volume di una saga.",
+  "totalChapters": 31,
+  "totalWords": 72000,
+  "contactEmail": "mimarini@libero.it",
+  "endNote": "Hai letto i primi tre capitoli di «Non è ciò che pensi». Il manoscritto completo, 31 capitoli e circa 72.000 parole, è un romanzo autoconclusivo e il primo volume di una serie: è disponibile su richiesta per case editrici e agenti letterari.",
   "chapters": [
     {
       "id": "capitolo-1",
