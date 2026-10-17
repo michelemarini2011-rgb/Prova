@@ -1,11 +1,11 @@
 rules_version = '2';
 
 // Regole di sicurezza dell'archivio Firestore.
-// IMPORTANTE: sostituisci tua-email@example.com con la tua email (la stessa
-// messa in public/firebase-config.js). Puoi indicarne più d'una:
-//   ['tua-email@example.com', 'altra@example.com']
-// Per ragioni di sicurezza l'accesso da amministratore funziona solo dopo aver
-// confermato l'email tramite il link che Firebase invia alla registrazione.
+// L'email dell'autore (o degli autori) è nel documento config/admins del
+// database, nel campo "emails" (un elenco di email in minuscolo): così non
+// compare né nel sito né nel codice. Per ragioni di sicurezza l'accesso da
+// autore funziona solo dopo aver confermato l'email con il link che Firebase
+// invia alla registrazione.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -14,10 +14,14 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isAdmin() {
+    function isAdminEmail() {
       return signedIn()
-        && request.auth.token.email_verified == true
-        && request.auth.token.email.lower() in ['tua-email@example.com'];
+        && request.auth.token.email.lower()
+          in get(/databases/$(database)/documents/config/admins).data.emails;
+    }
+
+    function isAdmin() {
+      return isAdminEmail() && request.auth.token.email_verified == true;
     }
 
     function isOwner(uid) {
@@ -26,6 +30,12 @@ service cloud.firestore {
 
     function text(value, min, max) {
       return value is string && value.size() >= min && value.size() <= max;
+    }
+
+    // Elenco degli autori: lo legge solo l'autore stesso (serve al sito per
+    // sapere se mostrare il pannello). Si modifica dalla console di Firebase.
+    match /config/admins {
+      allow get: if isAdminEmail();
     }
 
     // Dati pubblici del libro: chiunque li vede, solo l'autore li cambia.

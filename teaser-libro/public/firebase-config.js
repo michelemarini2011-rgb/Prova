@@ -1,22 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CONFIGURAZIONE — è l'unico file da modificare (oltre a firestore.rules).
+// CONFIGURAZIONE DI FIREBASE
 //
-// 1. Nella console di Firebase apri Impostazioni progetto → Generali → "Le tue app"
-//    → aggiungi un'app Web (icona </>) e copia qui sotto i valori di firebaseConfig.
-// 2. In adminEmails metti la tua email: con quell'account vedrai il pannello
-//    "Statistiche" e potrai caricare i capitoli. Usa la stessa email anche in
-//    firestore.rules, che è ciò che protegge davvero i dati.
-//
+// Nella console di Firebase: Impostazioni progetto → Generali → "Le tue app"
+// → app Web (icona </>): copia qui i valori di firebaseConfig.
 // Questi valori non sono segreti: è normale che siano visibili nel sito.
+//
+// L'email dell'autore NON va qui: si trova nel database, documento
+// config/admins (vedi README).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const firebaseConfig = {
-  apiKey: 'INSERISCI-QUI',
-  authDomain: 'il-tuo-progetto.firebaseapp.com',
-  projectId: 'il-tuo-progetto',
-  storageBucket: 'il-tuo-progetto.firebasestorage.app',
-  messagingSenderId: '000000000000',
-  appId: '1:000000000000:web:0000000000000000',
+  apiKey: 'AIzaSyAgN_yTfnX7RRERU4YXaJq4FzUqFoIrmpk',
+  authDomain: 'non-e--cio--che-pensi.firebaseapp.com',
+  projectId: 'non-e--cio--che-pensi',
+  storageBucket: 'non-e--cio--che-pensi.firebasestorage.app',
+  messagingSenderId: '200782413732',
+  appId: '1:200782413732:web:453a11046980647494cb31',
 };
-
-export const adminEmails = ['tua-email@example.com'];

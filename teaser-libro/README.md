@@ -57,10 +57,12 @@ conserva i dati.
    all'app e registrala. Non spuntare Firebase Hosting in questo passaggio: lo
    configuriamo dopo.
 2. Ti viene mostrato un blocco `firebaseConfig`. Copia i valori in
-   **`public/firebase-config.js`** e, nella stessa pagina, scrivi la tua email in `adminEmails`.
-3. Apri **`firestore.rules`** e sostituisci `tua-email@example.com` con la stessa email.
-4. Scrivi l'ID del progetto (lo trovi in *Impostazioni progetto*) dentro **`.firebaserc`**
-   al posto di `il-tuo-progetto`.
+   **`public/firebase-config.js`**.
+3. Scrivi l'ID del progetto (lo trovi in *Impostazioni progetto*) dentro **`.firebaserc`**.
+4. Indica chi è l'autore. In **Firestore Database → Dati** premi *Avvia raccolta*, chiamala
+   `config` e crea il documento con ID `admins`. Aggiungi un campo `emails` di tipo
+   **array** con dentro la tua email, scritta in minuscolo. Così la tua email non compare
+   né nel sito né nel codice.
 
 ### 3. Pubblica
 
@@ -95,7 +97,7 @@ basta `npm run deploy`, con la strada B le incolli di nuovo nella console.
 
 ### 4. Carica i capitoli
 
-1. Apri il sito e **registrati con la tua email**, quella messa in `adminEmails` e in `firestore.rules`.
+1. Apri il sito e **registrati con la tua email**, quella messa in `config/admins`.
 2. Conferma l'email con il link che ti arriva (controlla anche lo spam).
    È obbligatorio per l'account autore: così nessuno può spacciarsi per te.
 3. Premi **Statistiche**, poi **Ho confermato**. In fondo alla pagina, in

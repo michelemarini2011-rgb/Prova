@@ -251,7 +251,7 @@ import * as data from './data.js';
     }
     let s;
     try {
-      s = await data.loadAdminStats();
+      s = await data.loadAdminStats(state.user.email);
     } catch (err) {
       app.innerHTML = `<div class="page">${topbar()}<p class="error">${esc(data.errorMessage(err))}</p>
         <p class="empty">Se l'errore è «Operazione non consentita», controlla di aver inserito la tua email in firestore.rules e di aver pubblicato le regole.</p>

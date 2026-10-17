@@ -7,6 +7,7 @@
 //   users/{uid}        profilo di chi si registra
 //   progress/{uid}     punto di lettura per capitolo
 //   messages/{id}      messaggi inviati all'autore
+//   config/admins      { emails: [...] } — chi è l'autore (non leggibile dai visitatori)
 // Chi può leggere o scrivere cosa è stabilito in firestore.rules.
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
@@ -30,12 +31,11 @@ import {
   addDoc,
   writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { firebaseConfig, adminEmails } from './firebase-config.js';
+import { firebaseConfig } from './firebase-config.js';
 import { render as renderMarkdown, countWords } from './markdown.js';
 
 export const isConfigured = !String(firebaseConfig.apiKey).includes('INSERISCI');
 
-const ADMINS = adminEmails.map((e) => e.trim().toLowerCase());
 const now = () => new Date().toISOString();
 
 let auth = null;
@@ -46,8 +46,6 @@ if (isConfigured) {
   auth.languageCode = 'it';
   db = getFirestore(app);
 }
-
-export const isAdminEmail = (email) => ADMINS.includes(String(email || '').toLowerCase());
 
 // Traduce i codici di errore di Firebase in messaggi comprensibili.
 export function errorMessage(err) {
@@ -77,15 +75,24 @@ function fail(message) {
 
 // --------------------------------------------------------------- utenti
 
+// È l'autore se le regole gli permettono di leggere config/admins.
+async function checkAdmin() {
+  try {
+    await getDoc(doc(db, 'config', 'admins'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function loadUser(fbUser) {
   if (!fbUser) return null;
   let profile = {};
-  try {
-    const snap = await getDoc(doc(db, 'users', fbUser.uid));
-    if (snap.exists()) profile = snap.data();
-  } catch {
-    // profilo non leggibile: si usano i dati dell'account
-  }
+  const [snap, isAdmin] = await Promise.all([
+    getDoc(doc(db, 'users', fbUser.uid)).catch(() => null),
+    checkAdmin(),
+  ]);
+  if (snap?.exists()) profile = snap.data();
   return {
     uid: fbUser.uid,
     email: fbUser.email,
@@ -93,7 +100,7 @@ async function loadUser(fbUser) {
     name: profile.name || fbUser.email.split('@')[0],
     role: profile.role || 'altro',
     company: profile.company || '',
-    isAdmin: isAdminEmail(fbUser.email),
+    isAdmin,
   };
 }
 
@@ -186,7 +193,7 @@ export async function sendMessage(uid, message) {
 
 // ----------------------------------------------------------- amministrazione
 
-export async function loadAdminStats() {
+export async function loadAdminStats(adminEmail) {
   const [bookMeta, usersSnap, progressSnap, messagesSnap] = await Promise.all([
     getBook(),
     getDocs(collection(db, 'users')),
@@ -199,7 +206,7 @@ export async function loadAdminStats() {
 
   const users = usersSnap.docs
     .map((d) => ({ uid: d.id, ...d.data() }))
-    .filter((u) => !isAdminEmail(u.email))
+    .filter((u) => u.email !== adminEmail)
     .map((u) => ({
       ...u,
       chapters: chapters.map((c) => progress.get(u.uid)?.[c.id]?.max || 0),
