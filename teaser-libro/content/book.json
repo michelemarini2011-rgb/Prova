@@ -11,6 +11,17 @@
   "contactEmail": "",
   "endNote": "",
   "chapters": [
-    { "id": "capitolo-1", "file": "01-tenebra.md", "title": "Capitolo 1", "subtitle": "Tenebra" }
+    {
+      "id": "capitolo-1",
+      "file": "01-tenebra.md",
+      "title": "Capitolo 1",
+      "subtitle": "Tenebra"
+    },
+    {
+      "id": "capitolo-2",
+      "file": "02-illusioni.md",
+      "title": "Capitolo 2",
+      "subtitle": "Illusioni"
+    }
   ]
 }
