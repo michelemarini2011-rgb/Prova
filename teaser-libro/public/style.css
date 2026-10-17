@@ -159,7 +159,9 @@ td.pct { font-variant-numeric: tabular-nums; }
 .icon-btn svg { width: 22px; height: 22px; }
 .r-progress { width: 100%; margin: 0; accent-color: var(--accent-2); height: 24px; }
 .r-info { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--r-muted); }
-.r-info span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r-info span { white-space: nowrap; }
+.r-info span:first-child { flex: none; }
+.r-info span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 .r-viewport { position: relative; flex: 1; overflow: hidden; touch-action: pan-y; cursor: default; }
 .r-frame { position: absolute; overflow: hidden; }
@@ -168,7 +170,6 @@ td.pct { font-variant-numeric: tabular-nums; }
   column-fill: auto;
   font-family: var(--r-font); font-size: var(--r-size); line-height: var(--r-leading);
   text-align: justify; hyphens: auto; -webkit-hyphens: auto;
-  will-change: transform;
 }
 .r-flow.animate { transition: transform .32s cubic-bezier(.2, .7, .2, 1); }
 .r-flow p { margin: 0; text-indent: 1.4em; orphans: 2; widows: 2; }

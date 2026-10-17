@@ -374,7 +374,7 @@ import * as data from './data.js';
     r.flow.innerHTML =
       `<span class="ch-label">${esc(meta.title)}</span>${ch.html}` +
       (ch.isLast ? '<p class="end-mark">Fine dell\'anteprima</p>' : '') +
-      '<span class="flow-end"></span>';
+      '<span class="flow-end">\u200b</span>';
 
     if (document.fonts?.ready) await document.fonts.ready;
     r.layout();
@@ -448,19 +448,41 @@ import * as data from './data.js';
         top: `${top}px`,
         bottom: `${top}px`,
       });
-      Object.assign(r.flow.style, {
-        width: `${width}px`,
-        padding: `0 ${pad}px`,
-        columnCount: width >= 860 ? '2' : '1',
-        columnGap: `${pad * 2}px`,
-        transform: 'none',
-      });
       r.flow.classList.remove('animate');
-      // Numero di pagine = posizione orizzontale del segnaposto finale / larghezza pagina.
+      r.flow.style.transform = 'none';
+      // Il contenitore del testo è largo esattamente quanto tutte le pagine messe
+      // in fila: nessuna colonna "sporge" fuori, cosa che Safari non misura né
+      // disegna correttamente. Si parte da una stima e la si raddoppia se il
+      // testo non ci sta, poi si riduce al numero esatto di pagine.
+      const cols = width >= 860 ? 2 : 1;
       const end = r.flow.querySelector('.flow-end');
-      const flowLeft = r.flow.getBoundingClientRect().left;
-      const endLeft = end ? end.getBoundingClientRect().left : flowLeft;
-      r.pages = Math.max(1, Math.floor((endLeft - flowLeft) / width) + 1);
+      const setPages = (n) => {
+        Object.assign(r.flow.style, {
+          width: `${n * width}px`,
+          padding: `0 ${pad}px`,
+          columnCount: String(n * cols),
+          columnGap: `${pad * 2}px`,
+        });
+      };
+      const measure = () => {
+        if (!end) return 1;
+        const offset = end.getBoundingClientRect().left - r.flow.getBoundingClientRect().left;
+        return Math.max(1, Math.floor(offset / width) + 1);
+      };
+      // Stima generosa dal numero di caratteri, così già al primo tentativo
+      // tutto il testo sta dentro il contenitore.
+      const fontSize = parseFloat(getComputedStyle(r.flow).fontSize) || 19;
+      const colWidth = (width - 2 * pad * cols) / cols;
+      const lines = Math.max(1, Math.floor((vh - top * 2) / (fontSize * 1.6)));
+      const charsPerPage = Math.max(1, (colWidth / (fontSize * 0.42)) * lines * cols);
+      let guess = Math.ceil((r.flow.textContent.length / charsPerPage) * 1.6) + 4;
+      setPages(guess);
+      while (measure() >= guess && guess < 4096) {
+        guess *= 2;
+        setPages(guess);
+      }
+      r.pages = measure();
+      setPages(r.pages);
       r.range.max = String(r.pages - 1);
     };
 
@@ -667,12 +689,26 @@ import * as data from './data.js';
     const noCopy = (e) => e.preventDefault();
     document.addEventListener('keydown', onKey);
     window.addEventListener('resize', onResize);
+    // Ricalcola anche quando cambia solo l'area del testo (es. barra di Safari
+    // che compare o scompare, riga in basso che cambia altezza).
+    let lastSize = '';
+    const ro = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => {
+          const size = `${r.viewport.clientWidth}x${r.viewport.clientHeight}`;
+          if (size !== lastSize) {
+            lastSize = size;
+            onResize();
+          }
+        })
+      : null;
+    ro?.observe(r.viewport);
     document.addEventListener('visibilitychange', onHide);
     root.addEventListener('contextmenu', noCopy);
     root.addEventListener('copy', noCopy);
     r.cleanup.push(() => {
       document.removeEventListener('keydown', onKey);
       window.removeEventListener('resize', onResize);
+      ro?.disconnect();
       document.removeEventListener('visibilitychange', onHide);
       const meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.content = '#16324a';
