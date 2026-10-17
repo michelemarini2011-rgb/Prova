@@ -134,7 +134,7 @@ import * as data from './data.js';
          <a class="btn ghost" href="#/accedi">Ho già un account</a>`;
     const meta = [
       b.genre,
-      `${b.chapters.length} capitoli in anteprima`,
+      b.chapters.length === 1 ? '1 capitolo in anteprima' : `${b.chapters.length} capitoli in anteprima`,
       b.totalChapters ? `${b.totalChapters} capitoli in tutto` : '',
       b.totalWords ? `≈ ${b.totalWords.toLocaleString('it-IT')} parole` : '',
     ].filter(Boolean);
@@ -146,7 +146,7 @@ import * as data from './data.js';
         <div>
           <p class="eyebrow">Anteprima riservata</p>
           <h1>${esc(b.title)}</h1>
-          <p class="by">di ${esc(b.author)}</p>
+          ${b.author ? `<p class="by">di ${esc(b.author)}</p>` : ''}
           ${b.tagline ? `<p class="tagline">${esc(b.tagline)}</p>` : ''}
           <div class="cta">${cta}</div>
           <div class="meta-row">${meta.map((m) => `<span>${esc(m)}</span>`).join('')}</div>
@@ -226,7 +226,7 @@ import * as data from './data.js';
       ${topbar()}
       <div class="prose">
         <h1>Informativa privacy</h1>
-        <p>Il titolare del trattamento è ${esc(b.author)}${b.contactEmail ? ` (<a href="mailto:${esc(b.contactEmail)}">${esc(b.contactEmail)}</a>)` : ''}.</p>
+        <p>Il titolare del trattamento è ${esc(b.author || "l'autore del libro")}${b.contactEmail ? ` (<a href="mailto:${esc(b.contactEmail)}">${esc(b.contactEmail)}</a>)` : ''}.</p>
         <p>I dati raccolti con la registrazione (nome, email, ruolo, casa editrice o agenzia) e l'avanzamento della lettura sono usati esclusivamente per consentire l'accesso all'anteprima del libro e per ricontattarti in merito alla sua pubblicazione. Non vengono ceduti a terzi.</p>
         <p>Puoi chiedere in qualsiasi momento l'accesso, la rettifica o la cancellazione dei tuoi dati scrivendo al titolare.</p>
         <p>I dati sono conservati tramite i servizi Google Firebase (Authentication e Cloud Firestore). Il sito non usa cookie di profilazione: per mantenere l'accesso e le preferenze di lettura usa solo la memoria locale del browser.</p>
