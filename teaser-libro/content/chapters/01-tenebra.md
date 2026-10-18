@@ -110,7 +110,7 @@ Wakkerty si voltò verso la tenutaria, inclinando leggermente la testa con fare 
 
 La donna, avvolta nel suo dorato mistero, sospirò lievemente, con un’aria di falsa indulgenza.
 
-«Oh, ispettore, la mia ragazza non sa nulla. Era semplicemente sconvolta alla vista del corpo. Immagino che la morte non sia un evento piacevole per chiunque.»
+«Oh, detective, la mia ragazza non sa nulla. Era semplicemente sconvolta alla vista del corpo. Immagino che la morte non sia un evento piacevole per chiunque.»
 
 «Ah, certo, certo,» annuì Wakkerty, tamburellando le dita sul pomo del suo bastone. «Ma sa, ho sempre trovato affascinante il modo in cui le persone reagiscono alla morte. Alcuni piangono, altri restano impassibili. Altri ancora... si nascondono.»
 

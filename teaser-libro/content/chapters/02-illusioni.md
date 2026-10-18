@@ -294,7 +294,7 @@ Wakkerty fece due passi avanti, il bastone che colpiva leggero il pavimento a og
 
 Quirk rimase sulla soglia, le orecchie dritte, il pelo che si arricciava impercettibilmente.
 
-Elana si ritrasse dietro di lui, gli occhi sgranati.
+La ragazza si ritrasse dietro di lui, gli occhi sgranati.
 
 Poi Launus entrò.
 
